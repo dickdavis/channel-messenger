@@ -91,7 +91,7 @@ Authenticated via `Authorization: Bearer <token>` header.
 |---|---|---|
 | `POST` | `/api/sessions` | Register a new session. Accepts optional `name` in body; returns `id` and `name`. |
 | `GET` | `/api/sessions/:id/messages?since=<timestamp>` | Poll for messages. Use `since` to get only new messages. |
-| `POST` | `/api/sessions/:id/messages` | Send a message. Body: `{ "content": "...", "role": "assistant" }` |
+| `POST` | `/api/sessions/:id/messages` | Send a message as the assistant. Body: `{ "content": "..." }` |
 
 ### Auth routes (browser)
 
@@ -110,8 +110,8 @@ Authenticated via session cookie. Used by the UI only.
 | `POST` | `/settings/keys` | Generate a new API key |
 | `GET` | `/settings/keys` | List API keys |
 | `DELETE` | `/settings/keys/:id` | Revoke an API key |
-| `GET` | `/api/sessions/:id/messages` | Poll for messages (same route as MCP, different auth) |
-| `POST` | `/api/sessions/:id/messages` | Send a message as the user (`role: "user"`) |
+| `GET` | `/sessions/:id/messages` | Poll for messages |
+| `POST` | `/sessions/:id/messages` | Send a message as the user. Body: `{ "content": "..." }` |
 
 ## Deployment
 
