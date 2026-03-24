@@ -10,7 +10,4 @@ directory = ".svelte-kit/cloudflare"
 [[d1_databases]]
 binding = "DB"
 database_name = "messenger-db"
-database_id = "TODO"
-
-[vars]
-ALLOWED_GITHUB_IDS = "10838930"
+database_id = "D1_DATABASE_ID_PLACEHOLDER"

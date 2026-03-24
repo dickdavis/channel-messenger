@@ -37,6 +37,22 @@ GITHUB_CLIENT_ID=<your client id>
 GITHUB_CLIENT_SECRET=<your client secret>
 ```
 
+### Wrangler config
+
+Create a local D1 database and generate `wrangler.toml` from the example:
+
+```sh
+bunx wrangler d1 create messenger-db
+```
+
+Copy the returned `database_id` and generate your config:
+
+```sh
+sed 's/D1_DATABASE_ID_PLACEHOLDER/<your-database-id>/' wrangler.toml.example > wrangler.toml
+```
+
+Then update `ALLOWED_GITHUB_IDS` in `.dev.vars` with your GitHub user ID (see below).
+
 ### Database setup
 
 ```sh
@@ -101,7 +117,7 @@ Authenticated via session cookie. Used by the UI only.
 
 ### One-time setup
 
-1. Create the D1 database and copy the `database_id` into `wrangler.toml`:
+1. Create the D1 database (if not already done during local setup):
    ```sh
    bunx wrangler d1 create messenger-db
    ```
@@ -118,16 +134,19 @@ Authenticated via session cookie. Used by the UI only.
    bunx wrangler secret put GITHUB_CLIENT_SECRET
    ```
 
-4. Create a production GitHub OAuth App at https://github.com/settings/developers:
+4. Set `ALLOWED_GITHUB_IDS` as a plaintext environment variable in the Cloudflare dashboard under Workers & Pages > your worker > Settings > Variables. Value is a comma-separated list of GitHub user IDs.
+
+5. Create a production GitHub OAuth App at https://github.com/settings/developers:
    - **Homepage URL**: `https://<your-domain>`
    - **Callback URL**: `https://<your-domain>/auth/callback`
 
-5. Configure a custom domain in the Cloudflare dashboard under Workers & Pages > your worker > Settings > Domains & Routes.
+6. Configure a custom domain in the Cloudflare dashboard under Workers & Pages > your worker > Settings > Domains & Routes.
 
-6. Connect the GitHub repo in the Cloudflare dashboard:
+7. Connect the GitHub repo in the Cloudflare dashboard:
    - Go to Workers & Pages > Create > Connect to Git
-   - Build command: `bun run build`
-   - Build output directory: `.svelte-kit/cloudflare`
+   - Build command: `sed 's/D1_DATABASE_ID_PLACEHOLDER/'$D1_DATABASE_ID'/' wrangler.toml.example > wrangler.toml && bun run build`
+   - Deploy command: `bunx wrangler deploy`
+   - Set `D1_DATABASE_ID` as an environment variable in the build settings
 
 Every push to `main` triggers an automatic build and deploy.
 
