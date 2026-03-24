@@ -21,4 +21,4 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["SessionHub"]
+new_sqlite_classes = ["SessionHub"]
