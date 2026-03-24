@@ -137,6 +137,10 @@
 		flex: 1;
 		padding: 24px 16px;
 		overflow-y: auto;
+		max-width: 640px;
+		margin: 0 auto;
+		width: 100%;
+		box-sizing: border-box;
 	}
 
 	h2 {
