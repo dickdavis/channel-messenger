@@ -1,11 +1,17 @@
 import { verifySession } from '$lib/session'
 import { verifyToken } from '$lib/auth'
 import { redirect } from '@sveltejs/kit'
+import { dev } from '$app/environment'
 import type { Handle } from '@sveltejs/kit'
 
 const PUBLIC_PATHS = ['/auth/login', '/auth/callback']
 
 export const handle: Handle = async ({ event, resolve }) => {
+  // Share platform env with the Vite plugin for WebSocket auth in dev
+  if (dev && event.platform?.env != null && globalThis.devPlatformEnv == null) {
+    globalThis.devPlatformEnv = event.platform.env
+  }
+
   const secret = event.platform?.env.HMAC_SECRET ?? ''
   const cookieHeader = event.request.headers.get('Cookie')
   event.locals.user = await verifySession(secret, cookieHeader)
