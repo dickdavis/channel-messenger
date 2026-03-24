@@ -14,11 +14,13 @@ interface BroadcastPayload {
   created_at: string
 }
 
+interface SocketAttachment {
+  authenticated: boolean
+}
+
 const AUTH_TIMEOUT_MS = 5000
 
 export class SessionHub extends DurableObject<Env> {
-  private readonly authenticated: Set<WebSocket> = new Set()
-
   async fetch (request: Request): Promise<Response> {
     const url = new URL(request.url)
 
@@ -38,6 +40,7 @@ export class SessionHub extends DurableObject<Env> {
     const [client, server] = Object.values(pair)
 
     this.ctx.acceptWebSocket(server)
+    server.serializeAttachment({ authenticated: false })
 
     // Schedule auth timeout — close if not authenticated within 5s
     this.ctx.waitUntil(this.enforceAuthTimeout(server))
@@ -47,7 +50,8 @@ export class SessionHub extends DurableObject<Env> {
 
   async enforceAuthTimeout (ws: WebSocket): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, AUTH_TIMEOUT_MS))
-    if (!this.authenticated.has(ws)) {
+    const attachment: SocketAttachment | null = ws.deserializeAttachment()
+    if (attachment?.authenticated !== true) {
       ws.send(JSON.stringify({ type: 'error', message: 'Authentication timeout' }))
       ws.close(4001, 'Authentication timeout')
     }
@@ -57,8 +61,12 @@ export class SessionHub extends DurableObject<Env> {
     const message: BroadcastPayload = await request.json()
     const payload = JSON.stringify({ type: 'message', message })
 
-    for (const ws of this.authenticated) {
-      ws.send(payload)
+    // getWebSockets() returns all live sockets — survives hibernation
+    for (const ws of this.ctx.getWebSockets()) {
+      const attachment: SocketAttachment | null = ws.deserializeAttachment()
+      if (attachment?.authenticated === true) {
+        ws.send(payload)
+      }
     }
 
     return new Response('ok')
@@ -77,7 +85,7 @@ export class SessionHub extends DurableObject<Env> {
     if (parsed.type === 'auth' && typeof parsed.token === 'string') {
       const result = await verifyToken(this.env.DB, this.env.HMAC_SECRET, parsed.token)
       if (result != null) {
-        this.authenticated.add(ws)
+        ws.serializeAttachment({ authenticated: true })
         ws.send(JSON.stringify({ type: 'auth', status: 'ok' }))
       } else {
         ws.send(JSON.stringify({ type: 'error', message: 'Invalid token' }))
@@ -87,17 +95,10 @@ export class SessionHub extends DurableObject<Env> {
   }
 
   async webSocketClose (): Promise<void> {
-    // Rebuild authenticated set from live sockets
-    const live = new Set(this.ctx.getWebSockets())
-    for (const ws of this.authenticated) {
-      if (!live.has(ws)) {
-        this.authenticated.delete(ws)
-      }
-    }
+    // No cleanup needed — hibernation API manages the socket set
   }
 
   async webSocketError (ws: WebSocket): Promise<void> {
-    this.authenticated.delete(ws)
     ws.close(1011, 'Unexpected error')
   }
 }
