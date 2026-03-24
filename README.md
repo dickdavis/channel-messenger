@@ -144,7 +144,7 @@ Authenticated via session cookie. Used by the UI only.
 
 7. Connect the GitHub repo in the Cloudflare dashboard:
    - Go to Workers & Pages > Create > Connect to Git
-   - Build command: `sed 's/D1_DATABASE_ID_PLACEHOLDER/'$D1_DATABASE_ID'/' wrangler.toml.example > wrangler.toml && bun run build`
+   - Build command: `sed "s/D1_DATABASE_ID_PLACEHOLDER/$D1_DATABASE_ID/" wrangler.toml.example > wrangler.toml && bun run build`
    - Deploy command: `bunx wrangler deploy`
    - Set `D1_DATABASE_ID` as an environment variable in the build settings
 
