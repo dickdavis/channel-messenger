@@ -37,7 +37,7 @@
 
 	async function fetchMessages() {
 		if (!activeSessionId) return;
-		const res = await fetch(`/api/sessions/${activeSessionId}/messages`);
+		const res = await fetch(`/sessions/${activeSessionId}/messages`);
 		if (res.ok) {
 			messages = await res.json();
 		}
@@ -55,10 +55,10 @@
 
 	async function sendMessage(content: string) {
 		if (!activeSessionId) return;
-		const res = await fetch(`/api/sessions/${activeSessionId}/messages`, {
+		const res = await fetch(`/sessions/${activeSessionId}/messages`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ content, role: 'user' })
+			body: JSON.stringify({ content })
 		});
 		if (!res.ok) return;
 		await fetchMessages();

@@ -38,7 +38,3 @@ export async function verifyToken (
   if (row == null) return null
   return { userId: row.user_id }
 }
-
-export function resolveUserId (locals: App.Locals): number | null {
-  return locals.user?.id ?? locals.apiUser?.userId ?? null
-}

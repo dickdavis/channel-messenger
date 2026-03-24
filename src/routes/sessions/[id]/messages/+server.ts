@@ -1,9 +1,9 @@
 import { json, error } from '@sveltejs/kit'
 import type { RequestHandler } from './$types'
 
-// GET /api/sessions/:id/messages — poll for messages (API)
+// GET /sessions/:id/messages — poll for messages (browser)
 export const GET: RequestHandler = async ({ params, url, locals, platform }) => {
-  const userId = locals.apiUser?.userId
+  const userId = locals.user?.id
   if (userId == null) return error(401, 'Not authenticated')
   const db = (platform as App.Platform).env.DB
 
@@ -39,9 +39,9 @@ export const GET: RequestHandler = async ({ params, url, locals, platform }) => 
   return json(results)
 }
 
-// POST /api/sessions/:id/messages — send a message as assistant (API)
+// POST /sessions/:id/messages — send a message as the user (browser)
 export const POST: RequestHandler = async ({ params, request, locals, platform }) => {
-  const userId = locals.apiUser?.userId
+  const userId = locals.user?.id
   if (userId == null) return error(401, 'Not authenticated')
   const db = (platform as App.Platform).env.DB
 
@@ -63,7 +63,7 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 
   const result = await db
     .prepare('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)')
-    .bind(params.id, 'assistant', content)
+    .bind(params.id, 'user', content)
     .run()
 
   await db
