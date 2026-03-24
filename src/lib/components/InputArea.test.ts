@@ -47,7 +47,7 @@ describe('InputArea', () => {
     await fireEvent.input(textarea, { target: { value: 'hello' } })
     await fireEvent.click(screen.getByText('Send'))
 
-    expect(textarea.value).toBe('')
+    expect((textarea as HTMLTextAreaElement).value).toBe('')
   })
 
   test('Enter key submits the message', async () => {
