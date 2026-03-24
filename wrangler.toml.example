@@ -13,3 +13,12 @@ directory = ".svelte-kit/cloudflare"
 binding = "DB"
 database_name = "messenger-db"
 database_id = "D1_DATABASE_ID_PLACEHOLDER"
+
+[durable_objects]
+bindings = [
+  { name = "SESSION_HUB", class_name = "SessionHub" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["SessionHub"]

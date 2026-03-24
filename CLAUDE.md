@@ -8,7 +8,7 @@ Channel Messenger is a personal chat interface for communicating with Claude Cod
 
 ## Commands
 
-- `bun run dev` — start dev server (requires `.dev.vars` and `wrangler.toml`)
+- `bun run dev` — start dev server (Vite with WebSocket support via plugin)
 - `bun run build` — production build
 - `bun run check` — type-check (svelte-kit sync + svelte-check)
 - `bun run test` — run tests (`bun test --conditions browser`)
@@ -29,6 +29,8 @@ Both auth paths resolve to `locals.user` or `locals.apiUser` respectively.
 **Route split**: The app has parallel route sets for the same resources:
 - `/api/sessions/*` — external API (bearer token auth, used by Claude Code sessions)
 - `/sessions/*` — internal browser routes (cookie auth, used by the SvelteKit UI)
+
+**WebSocket support**: API clients can connect via `GET /api/ws/sessions/:id` instead of polling. In production, a Cloudflare Durable Object (`SessionHub` in `src/lib/server/session-hub.ts`) manages WebSocket connections per session. In dev, a Vite plugin (`src/vite-plugin-session-hub.ts`) provides an in-process WebSocket server on the same port. When a message is POSTed via any HTTP route, `notifySessionHub()` (`src/lib/server/notify.ts`) broadcasts to connected clients — using a `globalThis` bridge in dev, or the DO in production. The same Vite plugin's `closeBundle` hook wraps the built `_worker.js` to export the DO class.
 
 **Database**: Single D1 database with four tables: `users`, `sessions`, `api_keys`, `messages`. Migrations live in `migrations/`. Environment bindings are typed in `src/app.d.ts` under `App.Platform`.
 
