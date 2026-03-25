@@ -28,18 +28,18 @@
 	.bubble {
 		max-width: 70%;
 		padding: 8px 12px;
-		border-radius: 8px;
+		border-radius: var(--radius-lg);
 		word-wrap: break-word;
 	}
 
 	.message.user .bubble {
-		background: #4f46e5;
+		background: var(--color-primary);
 		color: #fff;
 	}
 
 	.message.assistant .bubble {
-		background: rgb(51 65 85);
-		color: #f4f4f5;
+		background: var(--color-bg-raised);
+		color: var(--color-text);
 	}
 
 	.markdown :global(p) {
@@ -51,18 +51,18 @@
 	}
 
 	.markdown :global(pre) {
-		background: rgb(15 23 42);
+		background: var(--color-bg-deep);
 		color: #d4d4d4;
 		padding: 8px 10px;
-		border-radius: 4px;
+		border-radius: var(--radius-sm);
 		overflow-x: auto;
-		font-size: 0.85rem;
+		font-size: var(--text-base);
 	}
 
 	.markdown :global(code) {
 		background: rgba(255, 255, 255, 0.1);
 		padding: 1px 4px;
-		border-radius: 3px;
+		border-radius: var(--radius-xs);
 		font-size: 0.85em;
 	}
 
@@ -84,8 +84,8 @@
 	.markdown :global(blockquote) {
 		margin: 4px 0;
 		padding-left: 10px;
-		border-left: 3px solid #64748b;
-		color: #94a3b8;
+		border-left: 3px solid var(--color-text-dim);
+		color: var(--color-text-muted);
 	}
 
 	.markdown :global(table) {
@@ -97,7 +97,7 @@
 
 	.markdown :global(th),
 	.markdown :global(td) {
-		border: 1px solid rgb(51 65 85);
+		border: 1px solid var(--color-bg-raised);
 		padding: 6px 10px;
 		text-align: left;
 	}
@@ -121,17 +121,17 @@
 	}
 
 	.markdown :global(a) {
-		color: #818cf8;
+		color: var(--color-primary-light);
 	}
 
 	.markdown :global(a:hover) {
-		color: #a5b4fc;
+		color: var(--color-primary-lighter);
 	}
 
 	.bubble time {
 		display: block;
-		font-size: 0.7rem;
-		color: #94a3b8;
+		font-size: var(--text-xs);
+		color: var(--color-text-muted);
 		margin-top: 4px;
 		text-align: right;
 	}

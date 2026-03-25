@@ -44,21 +44,21 @@
 		padding: 12px 16px;
 		border: none;
 		background: none;
-		color: #f4f4f5;
+		color: var(--color-text);
 		cursor: pointer;
 		text-align: left;
-		font-size: 0.9rem;
-		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
-		border-bottom: 1px solid rgb(51 65 85);
+		font-size: var(--text-md);
+		font-family: var(--font-mono);
+		border-bottom: 1px solid var(--color-bg-raised);
 	}
 
 	.session-item:hover {
-		background: rgb(51 65 85);
+		background: var(--color-bg-raised);
 	}
 
 	.session-item.active {
-		background: rgba(79, 70, 229, 0.2);
-		border-left: 3px solid #4f46e5;
+		background: var(--color-primary-bg);
+		border-left: 3px solid var(--color-primary);
 	}
 
 	.session-name {
@@ -66,17 +66,17 @@
 	}
 
 	.session-status {
-		font-size: 0.75rem;
-		color: #818cf8;
+		font-size: var(--text-sm);
+		color: var(--color-primary-light);
 	}
 
 	.session-status.inactive {
-		color: #64748b;
+		color: var(--color-text-dim);
 	}
 
 	.empty {
 		text-align: center;
-		color: #64748b;
+		color: var(--color-text-dim);
 		margin-top: 20px;
 	}
 </style>

@@ -96,24 +96,17 @@
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-		background: rgb(15 23 42);
-		color: #f4f4f5;
-	}
-
 	.app {
 		display: flex;
 		flex-direction: column;
 		height: 100vh;
 		width: 100%;
-		background: rgb(30 41 59);
+		background: var(--color-bg);
 	}
 
 	header {
 		padding: 12px 16px;
-		background: #4f46e5;
+		background: var(--color-primary);
 		color: #fff;
 		display: flex;
 		align-items: center;
@@ -122,8 +115,8 @@
 
 	header h1 {
 		margin: 0;
-		font-size: 1.2rem;
-		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+		font-size: var(--text-2xl);
+		font-family: var(--font-mono);
 	}
 
 	.back {
@@ -145,20 +138,20 @@
 
 	h2 {
 		margin: 0 0 4px;
-		font-size: 1.1rem;
-		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+		font-size: var(--text-xl);
+		font-family: var(--font-mono);
 	}
 
 	.description {
-		color: #94a3b8;
-		font-size: 0.9rem;
+		color: var(--color-text-muted);
+		font-size: var(--text-md);
 		margin: 0 0 16px;
 	}
 
 	.token-display {
-		background: rgba(79, 70, 229, 0.15);
-		border: 1px solid #4f46e5;
-		border-radius: 8px;
+		background: var(--color-primary-bg-subtle);
+		border: 1px solid var(--color-primary);
+		border-radius: var(--radius-lg);
 		padding: 12px;
 		margin-bottom: 16px;
 	}
@@ -169,18 +162,18 @@
 
 	.token-display code {
 		display: block;
-		background: rgb(15 23 42);
-		color: #818cf8;
+		background: var(--color-bg-deep);
+		color: var(--color-primary-light);
 		padding: 10px;
-		border-radius: 4px;
-		font-size: 0.85rem;
+		border-radius: var(--radius-sm);
+		font-size: var(--text-base);
 		word-break: break-all;
 		margin: 8px 0;
 	}
 
 	.warning {
-		color: #fbbf24;
-		font-size: 0.85rem;
+		color: var(--color-warning);
+		font-size: var(--text-base);
 		font-weight: 500;
 	}
 
@@ -193,41 +186,41 @@
 	.create-key input {
 		flex: 1;
 		padding: 8px 12px;
-		border: 1px solid rgb(51 65 85);
-		border-radius: 6px;
-		font-size: 0.9rem;
+		border: 1px solid var(--color-bg-raised);
+		border-radius: var(--radius-md);
+		font-size: var(--text-md);
 		font-family: inherit;
-		background: rgb(15 23 42);
-		color: #f4f4f5;
+		background: var(--color-bg-deep);
+		color: var(--color-text);
 	}
 
 	.create-key input::placeholder {
-		color: #64748b;
+		color: var(--color-text-dim);
 	}
 
 	.create-key input:focus {
 		outline: none;
-		border-color: #4f46e5;
+		border-color: var(--color-primary);
 	}
 
 	.create-key button {
 		padding: 8px 16px;
-		background: #4f46e5;
+		background: var(--color-primary);
 		color: #fff;
 		border: none;
-		border-radius: 6px;
+		border-radius: var(--radius-md);
 		cursor: pointer;
-		font-size: 0.9rem;
-		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+		font-size: var(--text-md);
+		font-family: var(--font-mono);
 		font-weight: 600;
 		white-space: nowrap;
-		transition: all 0.2s;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+		transition: var(--transition);
+		box-shadow: var(--shadow-btn);
 	}
 
 	.create-key button:hover {
-		background: #4338ca;
-		box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+		background: var(--color-primary-hover);
+		box-shadow: var(--shadow-btn-hover);
 	}
 
 	.create-key button:active {
@@ -242,7 +235,7 @@
 
 	.empty {
 		text-align: center;
-		color: #64748b;
+		color: var(--color-text-dim);
 		margin-top: 20px;
 	}
 </style>

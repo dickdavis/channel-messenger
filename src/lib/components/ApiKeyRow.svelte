@@ -33,8 +33,8 @@
 		justify-content: space-between;
 		align-items: center;
 		padding: 10px 12px;
-		background: rgb(51 65 85);
-		border-radius: 6px;
+		background: var(--color-bg-raised);
+		border-radius: var(--radius-md);
 	}
 
 	.key-row.revoked {
@@ -45,48 +45,48 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		font-size: 0.9rem;
+		font-size: var(--text-md);
 	}
 
 	.key-name {
 		font-weight: 500;
-		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+		font-family: var(--font-mono);
 	}
 
 	time {
-		color: #64748b;
-		font-size: 0.8rem;
+		color: var(--color-text-dim);
+		font-size: var(--text-base);
 	}
 
 	.badge {
-		font-size: 0.75rem;
+		font-size: var(--text-sm);
 		padding: 2px 6px;
-		border-radius: 4px;
-		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+		border-radius: var(--radius-sm);
+		font-family: var(--font-mono);
 	}
 
 	.badge.active {
-		background: rgba(79, 70, 229, 0.2);
-		color: #818cf8;
+		background: var(--color-primary-bg);
+		color: var(--color-primary-light);
 	}
 
 	.badge.revoked {
-		background: rgba(239, 68, 68, 0.15);
-		color: #f87171;
+		background: var(--color-danger-bg);
+		color: var(--color-danger-light);
 	}
 
 	.revoke-btn {
 		padding: 4px 10px;
 		background: none;
-		border: 1px solid #ef4444;
-		color: #f87171;
-		border-radius: 4px;
+		border: 1px solid var(--color-danger);
+		color: var(--color-danger-light);
+		border-radius: var(--radius-sm);
 		cursor: pointer;
-		font-size: 0.8rem;
-		transition: all 0.2s;
+		font-size: var(--text-base);
+		transition: var(--transition);
 	}
 
 	.revoke-btn:hover {
-		background: rgba(239, 68, 68, 0.15);
+		background: var(--color-danger-bg);
 	}
 </style>
