@@ -4,9 +4,9 @@
 	import MessageBubble from '$lib/components/MessageBubble.svelte';
 	import InputArea from '$lib/components/InputArea.svelte';
 	import SessionList from '$lib/components/SessionList.svelte';
+	import { createSessionSocket, type Message } from '$lib/ws';
 
 	type Session = { id: number; name: string; status: string; created_at: string };
-	type Message = { id: number; session_id: number; role: 'user' | 'assistant'; content: string; created_at: string };
 
 	let { data } = $props();
 	let sessions: Session[] = $state([]);
@@ -16,6 +16,8 @@
 	let hasNewMessages = $state(false);
 	let sidebarOpen = $state(false);
 	let chatContainer: HTMLElement;
+	let socketCleanup: (() => void) | null = null;
+	let selectGeneration = 0;
 
 	function scrollToBottom() {
 		if (chatContainer) {
@@ -35,22 +37,50 @@
 		sessions = data.sessions;
 	}
 
-	async function fetchMessages() {
+	async function fetchMessages(since?: string) {
 		if (!activeSessionId) return;
-		const res = await fetch(`/sessions/${activeSessionId}/messages`);
-		if (res.ok) {
+		let url = `/sessions/${activeSessionId}/messages`;
+		if (since != null) url += `?since=${encodeURIComponent(since)}`;
+		const res = await fetch(url);
+		if (!res.ok) return;
+		if (since != null) {
+			const newer: Message[] = await res.json();
+			for (const msg of newer) {
+				if (!messages.some((m) => m.id === msg.id)) {
+					messages = [...messages, msg];
+				}
+			}
+		} else {
 			messages = await res.json();
 		}
 	}
 
 	async function selectSession(id: number) {
+		const generation = ++selectGeneration;
+		socketCleanup?.();
+		socketCleanup = null;
 		activeSessionId = id;
 		sidebarOpen = false;
 		messages = [];
 		await fetchMessages();
+		if (generation !== selectGeneration) return;
 		// Use tick to wait for DOM update, then scroll
 		await new Promise((r) => setTimeout(r, 0));
 		scrollToBottom();
+
+		const { close } = createSessionSocket(id, {
+			onMessage (msg) {
+				if (!messages.some((m) => m.id === msg.id)) {
+					messages = [...messages, msg];
+				}
+			},
+			onConnect (isReconnect) {
+				if (!isReconnect) return;
+				const last = messages[messages.length - 1];
+				fetchMessages(last?.created_at);
+			}
+		});
+		socketCleanup = close;
 	}
 
 	async function sendMessage(content: string) {
@@ -61,7 +91,10 @@
 			body: JSON.stringify({ content })
 		});
 		if (!res.ok) return;
-		await fetchMessages();
+		const { id }: { id: number } = await res.json();
+		if (!messages.some((m) => m.id === id)) {
+			messages = [...messages, { id, session_id: activeSessionId, role: 'user', content, created_at: new Date().toISOString() }];
+		}
 	}
 
 	onMount(() => {
@@ -69,15 +102,12 @@
 		if (sessions.length > 0) {
 			selectSession(sessions[0].id);
 		}
-		const messagesInterval = setInterval(() => {
-			if (document.visibilityState === 'visible') fetchMessages();
-		}, 5000);
 		const sessionsInterval = setInterval(() => {
 			if (document.visibilityState === 'visible') fetchSessions();
 		}, 5000);
 		return () => {
-			clearInterval(messagesInterval);
 			clearInterval(sessionsInterval);
+			socketCleanup?.();
 		};
 	});
 

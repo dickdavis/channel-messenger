@@ -36,6 +36,14 @@ export function sessionHub (): Plugin {
         throw new Error('Platform env not available — has the server handled an HTTP request yet?')
       }
 
+      async function verifyOwnership (db: D1Database, sessionId: string, userId: number): Promise<boolean> {
+        const row = await db
+          .prepare('SELECT id FROM sessions WHERE id = ? AND user_id = ?')
+          .bind(sessionId, userId)
+          .first()
+        return row != null
+      }
+
       server.httpServer?.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
         const match = req.url?.match(WS_ROUTE)
         if (match == null) return // Let Vite handle HMR upgrades
@@ -52,35 +60,77 @@ export function sessionHub (): Plugin {
             }
           }, 5000)
 
-          const onMessage = (data: Buffer | string): void => {
-            if (authenticated) return
+          function markAuthenticated (): void {
+            clearTimeout(timeout)
+            authenticated = true
+            const set = sessions.get(sessionId) ?? new Set()
+            sessions.set(sessionId, set)
+            set.add(ws)
+            ws.send(JSON.stringify({ type: 'auth', status: 'ok' }))
+          }
 
-            let parsed: { type: string, token?: string }
+          // Try cookie auth first (browser clients).
+          // Token auth messages wait for this to settle to avoid races.
+          const cookieAuthDone = (async () => {
             try {
-              parsed = JSON.parse(String(data))
-            } catch {
-              return
+              const cookieHeader = req.headers.cookie ?? null
+              if (cookieHeader == null) return
+
+              const env = await getPlatformEnv()
+              const { verifySession } = await import('./lib/session')
+              const user = await verifySession(env.HMAC_SECRET, cookieHeader)
+
+              if (user == null) return
+
+              const owns = await verifyOwnership(env.DB, sessionId, user.id)
+              if (owns) {
+                markAuthenticated()
+              } else {
+                // Valid cookie but wrong session — reject immediately
+                clearTimeout(timeout)
+                ws.send(JSON.stringify({ type: 'error', message: 'Forbidden' }))
+                ws.close(4003, 'Forbidden')
+              }
+            } catch (err) {
+              console.error('[session-hub] Cookie auth error:', err)
             }
+          })()
 
-            if (parsed.type !== 'auth' || typeof parsed.token !== 'string') return
-
+          // Token auth fallback via message
+          const onMessage = (data: Buffer | string): void => {
             void (async () => {
+              // Wait for cookie auth to settle before attempting token auth
+              await cookieAuthDone
+              if (authenticated) return
+
+              let parsed: { type: string, token?: string }
+              try {
+                parsed = JSON.parse(String(data))
+              } catch {
+                return
+              }
+
+              if (parsed.type !== 'auth' || typeof parsed.token !== 'string') return
+
               try {
                 const env = await getPlatformEnv()
                 const { verifyToken } = await import('./lib/auth')
-                const result = await verifyToken(env.DB, env.HMAC_SECRET, parsed.token as string)
+                const result = await verifyToken(env.DB, env.HMAC_SECRET, parsed.token)
 
-                if (result != null) {
-                  clearTimeout(timeout)
-                  authenticated = true
-                  const set = sessions.get(sessionId) ?? new Set()
-                  sessions.set(sessionId, set)
-                  set.add(ws)
-                  ws.send(JSON.stringify({ type: 'auth', status: 'ok' }))
-                } else {
+                if (result == null) {
                   ws.send(JSON.stringify({ type: 'error', message: 'Invalid token' }))
                   ws.close(4003, 'Invalid token')
+                  return
                 }
+
+                const owns = await verifyOwnership(env.DB, sessionId, result.userId)
+                if (!owns) {
+                  ws.send(JSON.stringify({ type: 'error', message: 'Forbidden' }))
+                  ws.close(4003, 'Forbidden')
+                  return
+                }
+
+                markAuthenticated()
               } catch (err) {
                 console.error('[session-hub] Auth error:', err)
                 ws.send(JSON.stringify({ type: 'error', message: 'Internal error' }))
