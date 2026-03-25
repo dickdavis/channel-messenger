@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers'
 import { verifyToken } from '../auth'
+import { verifySession } from '../session'
 
 interface Env {
   DB: D1Database
@@ -16,9 +17,16 @@ interface BroadcastPayload {
 
 interface SocketAttachment {
   authenticated: boolean
+  userId?: number
+  sessionId?: string
 }
 
 const AUTH_TIMEOUT_MS = 5000
+
+function parseSessionId (url: string): string | null {
+  const match = url.match(/\/api\/ws\/sessions\/(\d+)$/)
+  return match != null ? match[1] : null
+}
 
 export class SessionHub extends DurableObject<Env> {
   async fetch (request: Request): Promise<Response> {
@@ -29,20 +37,39 @@ export class SessionHub extends DurableObject<Env> {
     }
 
     if (request.headers.get('Upgrade') === 'websocket') {
-      return await this.handleWebSocketUpgrade()
+      return await this.handleWebSocketUpgrade(request)
     }
 
     return new Response('Not found', { status: 404 })
   }
 
-  async handleWebSocketUpgrade (): Promise<Response> {
+  async handleWebSocketUpgrade (request: Request): Promise<Response> {
     const pair = new WebSocketPair()
     const [client, server] = Object.values(pair)
 
     this.ctx.acceptWebSocket(server)
-    server.serializeAttachment({ authenticated: false })
 
-    // Schedule auth timeout — close if not authenticated within 5s
+    const sessionId = parseSessionId(request.url)
+
+    // Try cookie auth first (browser clients)
+    const cookieHeader = request.headers.get('Cookie')
+    const user = await verifySession(this.env.HMAC_SECRET, cookieHeader)
+
+    if (user != null) {
+      const owns = sessionId != null && await this.verifyOwnership(sessionId, user.id)
+      if (owns) {
+        server.serializeAttachment({ authenticated: true, userId: user.id, sessionId })
+        server.send(JSON.stringify({ type: 'auth', status: 'ok' }))
+        return new Response(null, { status: 101, webSocket: client })
+      }
+      // Valid cookie but wrong session — reject immediately
+      server.send(JSON.stringify({ type: 'error', message: 'Forbidden' }))
+      server.close(4003, 'Forbidden')
+      return new Response(null, { status: 101, webSocket: client })
+    }
+
+    // Fall back to token auth message flow
+    server.serializeAttachment({ authenticated: false, sessionId })
     this.ctx.waitUntil(this.enforceAuthTimeout(server))
 
     return new Response(null, { status: 101, webSocket: client })
@@ -72,6 +99,14 @@ export class SessionHub extends DurableObject<Env> {
     return new Response('ok')
   }
 
+  async verifyOwnership (sessionId: string, userId: number): Promise<boolean> {
+    const row = await this.env.DB
+      .prepare('SELECT id FROM sessions WHERE id = ? AND user_id = ?')
+      .bind(sessionId, userId)
+      .first()
+    return row != null
+  }
+
   async webSocketMessage (ws: WebSocket, data: string | ArrayBuffer): Promise<void> {
     if (typeof data !== 'string') return
 
@@ -84,13 +119,25 @@ export class SessionHub extends DurableObject<Env> {
 
     if (parsed.type === 'auth' && typeof parsed.token === 'string') {
       const result = await verifyToken(this.env.DB, this.env.HMAC_SECRET, parsed.token)
-      if (result != null) {
-        ws.serializeAttachment({ authenticated: true })
-        ws.send(JSON.stringify({ type: 'auth', status: 'ok' }))
-      } else {
+      if (result == null) {
         ws.send(JSON.stringify({ type: 'error', message: 'Invalid token' }))
         ws.close(4003, 'Invalid token')
+        return
       }
+
+      const attachment: SocketAttachment | null = ws.deserializeAttachment()
+      const sessionId = attachment?.sessionId
+      if (sessionId != null) {
+        const owns = await this.verifyOwnership(sessionId, result.userId)
+        if (!owns) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Forbidden' }))
+          ws.close(4003, 'Forbidden')
+          return
+        }
+      }
+
+      ws.serializeAttachment({ authenticated: true, userId: result.userId, sessionId })
+      ws.send(JSON.stringify({ type: 'auth', status: 'ok' }))
     }
   }
 
