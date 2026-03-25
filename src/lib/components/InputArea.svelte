@@ -30,7 +30,7 @@
 
 <style>
 	.input-border {
-		border-top: 1px solid rgb(51 65 85);
+		border-top: 1px solid var(--color-bg-raised);
 	}
 
 	.input-area {
@@ -44,41 +44,41 @@
 	textarea {
 		flex: 1;
 		padding: 10px;
-		border: 1px solid rgb(51 65 85);
-		border-radius: 20px;
+		border: 1px solid var(--color-bg-raised);
+		border-radius: var(--radius-pill);
 		resize: none;
-		font-size: 1rem;
+		font-size: var(--text-lg);
 		font-family: inherit;
 		outline: none;
-		background: rgb(15 23 42);
-		color: #f4f4f5;
+		background: var(--color-bg-deep);
+		color: var(--color-text);
 	}
 
 	textarea::placeholder {
-		color: #64748b;
+		color: var(--color-text-dim);
 	}
 
 	textarea:focus {
-		border-color: #4f46e5;
+		border-color: var(--color-primary);
 	}
 
 	button {
 		padding: 10px 20px;
-		background: #4f46e5;
+		background: var(--color-primary);
 		color: #fff;
 		border: none;
-		border-radius: 20px;
+		border-radius: var(--radius-pill);
 		cursor: pointer;
-		font-size: 1rem;
-		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+		font-size: var(--text-lg);
+		font-family: var(--font-mono);
 		font-weight: 600;
-		transition: all 0.2s;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+		transition: var(--transition);
+		box-shadow: var(--shadow-btn);
 	}
 
 	button:hover {
-		background: #4338ca;
-		box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+		background: var(--color-primary-hover);
+		box-shadow: var(--shadow-btn-hover);
 	}
 
 	button:active {

@@ -184,19 +184,12 @@
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-		background: rgb(15 23 42);
-		color: #f4f4f5;
-	}
-
 	.app {
 		display: flex;
 		flex-direction: column;
 		height: 100vh;
 		width: 100%;
-		background: rgb(30 41 59);
+		background: var(--color-bg);
 		position: relative;
 		overflow: hidden;
 	}
@@ -215,7 +208,7 @@
 		left: 0;
 		bottom: 0;
 		width: 260px;
-		background: rgb(30 41 59);
+		background: var(--color-bg);
 		z-index: 20;
 		transform: translateX(-100%);
 		transition: transform 0.2s ease;
@@ -230,7 +223,7 @@
 
 	.sidebar-header {
 		padding: 12px 16px;
-		background: #4f46e5;
+		background: var(--color-primary);
 		color: #fff;
 		display: flex;
 		justify-content: space-between;
@@ -239,8 +232,8 @@
 
 	.sidebar-header h2 {
 		margin: 0;
-		font-size: 1.1rem;
-		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+		font-size: var(--text-xl);
+		font-family: var(--font-mono);
 	}
 
 	.close-btn {
@@ -261,7 +254,7 @@
 	/* Header */
 	header {
 		padding: 12px 16px;
-		background: #4f46e5;
+		background: var(--color-primary);
 		color: #fff;
 		display: flex;
 		justify-content: space-between;
@@ -286,15 +279,15 @@
 
 	header h1 {
 		margin: 0;
-		font-size: 1.2rem;
-		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+		font-size: var(--text-2xl);
+		font-family: var(--font-mono);
 	}
 
 	.settings-link {
 		color: #fff;
 		text-decoration: none;
-		font-size: 0.9rem;
-		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+		font-size: var(--text-md);
+		font-family: var(--font-mono);
 		opacity: 0.9;
 	}
 
@@ -317,20 +310,20 @@
 		left: 50%;
 		transform: translateX(-50%);
 		z-index: 5;
-		background: #4f46e5;
+		background: var(--color-primary);
 		color: #fff;
 		border: none;
-		border-radius: 16px;
+		border-radius: var(--radius-full);
 		padding: 6px 16px;
-		font-size: 0.85rem;
-		font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+		font-size: var(--text-base);
+		font-family: var(--font-mono);
 		cursor: pointer;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-		transition: all 0.2s;
+		transition: var(--transition);
 	}
 
 	.new-messages-toast:hover {
-		background: #4338ca;
+		background: var(--color-primary-hover);
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 	}
 
@@ -346,7 +339,7 @@
 
 	.empty {
 		text-align: center;
-		color: #64748b;
+		color: var(--color-text-dim);
 		margin-top: 40px;
 	}
 </style>
