@@ -8,7 +8,7 @@
 <div class="message {role}">
 	<div class="bubble">
 		<div class="markdown">{@html DOMPurify.sanitize(marked.parse(content) as string)}</div>
-		<time>{new Date(createdAt + 'Z').toLocaleTimeString()}</time>
+		<time>{new Date(createdAt.endsWith('Z') ? createdAt : createdAt + 'Z').toLocaleTimeString()}</time>
 	</div>
 </div>
 

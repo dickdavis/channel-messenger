@@ -3,10 +3,13 @@ import { MockD1Database } from '../../tests/mock-d1'
 
 const mockSendNotification = mock()
 
+const webpushMock = {
+  sendNotification: mockSendNotification
+}
+
 void mock.module('web-push', () => ({
-  default: {
-    sendNotification: mockSendNotification
-  }
+  default: webpushMock,
+  ...webpushMock
 }))
 
 const { sendPushForSession } = await import('./push-notify')
