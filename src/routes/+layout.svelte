@@ -6,15 +6,7 @@
   let { children } = $props()
 
   onMount(() => {
-    if (browser && 'serviceWorker' in navigator && !import.meta.env.PROD) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        registrations.forEach((registration) => {
-          registration.unregister()
-        })
-      })
-    }
-
-    if (browser && 'serviceWorker' in navigator && import.meta.env.PROD) {
+    if (browser && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js').catch((error) => {
         console.error('Service worker registration failed:', error)
       })

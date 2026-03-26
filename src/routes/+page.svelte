@@ -99,7 +99,11 @@
 
 	onMount(() => {
 		sessions = data.sessions;
-		if (sessions.length > 0) {
+		const params = new URLSearchParams(window.location.search);
+		const sessionParam = params.get('session');
+		if (sessionParam != null && sessions.some((s) => s.id === Number(sessionParam))) {
+			selectSession(Number(sessionParam));
+		} else if (sessions.length > 0) {
 			selectSession(sessions[0].id);
 		}
 		const sessionsInterval = setInterval(() => {

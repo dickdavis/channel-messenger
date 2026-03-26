@@ -34,6 +34,20 @@ describe('load /settings', () => {
     expect(result.keys[1].revoked_at).toBe('2025-01-03T00:00:00Z')
   })
 
+  test('returns vapidPublicKey from env', async () => {
+    const db = new MockD1Database()
+    db.onQuery('SELECT id, name, created_at, revoked_at FROM api_keys', { results: [] })
+
+    const event = mockRequestEvent({
+      url: 'http://localhost/settings',
+      locals: { user: mockUser() },
+      db
+    })
+
+    const result = await load(event as any) as any
+    expect(result.vapidPublicKey).toBe('test-vapid-public-key')
+  })
+
   test('binds correct user_id to query', async () => {
     const db = new MockD1Database()
     db.onQuery('SELECT id, name, created_at, revoked_at FROM api_keys', { results: [] })

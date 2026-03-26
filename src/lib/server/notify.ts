@@ -1,4 +1,5 @@
 import { dev } from '$app/environment'
+import { sendPushForSession } from './push-notify'
 
 interface MessagePayload {
   id: number | null
@@ -29,4 +30,20 @@ export async function notifySessionHub (
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(message)
   })
+}
+
+export async function notifyNewMessage (
+  env: App.Platform['env'],
+  sessionId: string,
+  message: MessagePayload
+): Promise<void> {
+  const tasks: Array<Promise<void>> = [
+    notifySessionHub(env.SESSION_HUB, sessionId, message)
+  ]
+
+  if (env.VAPID_PUBLIC_KEY !== '' && env.VAPID_PRIVATE_KEY !== '' && env.VAPID_SUBJECT !== '') {
+    tasks.push(sendPushForSession(env.DB, env, sessionId, message))
+  }
+
+  await Promise.allSettled(tasks)
 }

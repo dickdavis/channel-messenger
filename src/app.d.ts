@@ -17,6 +17,9 @@ declare global {
         GITHUB_CLIENT_SECRET: string
         ALLOWED_GITHUB_IDS?: string
         SESSION_HUB: DurableObjectNamespace
+        VAPID_PUBLIC_KEY: string
+        VAPID_PRIVATE_KEY: string
+        VAPID_SUBJECT: string
       }
       context: {
         waitUntil: (promise: Promise<unknown>) => void
