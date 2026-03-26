@@ -7,9 +7,14 @@ interface PushEnv {
 }
 
 interface PushMessage {
-  role: string
   content: string
 }
+
+type SendNotification = (
+  sub: webpush.PushSubscription,
+  payload: string,
+  options: webpush.RequestOptions
+) => Promise<webpush.SendResult>
 
 const MAX_TITLE_LENGTH = 100
 const MAX_SUBSCRIPTIONS = 20
@@ -18,7 +23,8 @@ export async function sendPushForSession (
   db: D1Database,
   env: PushEnv,
   sessionId: string,
-  message: PushMessage
+  message: PushMessage,
+  sendNotification: SendNotification = webpush.sendNotification.bind(webpush)
 ): Promise<void> {
   const session = await db
     .prepare('SELECT user_id, name FROM sessions WHERE id = ?')
@@ -55,7 +61,7 @@ export async function sendPushForSession (
 
   await Promise.allSettled(subs.map(async (sub) => {
     try {
-      await webpush.sendNotification(
+      await sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.key_p256dh, auth: sub.key_auth } },
         payload,
         { vapidDetails: vapidOptions }

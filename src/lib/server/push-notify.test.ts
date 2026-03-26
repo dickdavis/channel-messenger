@@ -1,18 +1,8 @@
-import { describe, expect, test, mock, beforeEach, spyOn } from 'bun:test'
+import { describe, expect, test, mock, beforeEach, afterEach, spyOn } from 'bun:test'
 import { MockD1Database } from '../../tests/mock-d1'
+import { sendPushForSession } from './push-notify'
 
 const mockSendNotification = mock()
-
-const webpushMock = {
-  sendNotification: mockSendNotification
-}
-
-void mock.module('web-push', () => ({
-  default: webpushMock,
-  ...webpushMock
-}))
-
-const { sendPushForSession } = await import('./push-notify')
 
 const ENV = {
   VAPID_SUBJECT: 'mailto:test@example.com',
@@ -29,15 +19,22 @@ const EXPECTED_VAPID_OPTIONS = {
 }
 
 describe('sendPushForSession', () => {
+  let errorSpy: ReturnType<typeof spyOn>
+
   beforeEach(() => {
     mockSendNotification.mockReset()
     mockSendNotification.mockResolvedValue({})
+    errorSpy = spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    errorSpy.mockRestore()
   })
 
   test('does nothing when session is not found', async () => {
     const db = new MockD1Database()
 
-    await sendPushForSession(db as any, ENV, '999', { role: 'assistant', content: 'hello' })
+    await sendPushForSession(db as any, ENV, '999', { content: 'hello' }, mockSendNotification as any)
     expect(mockSendNotification).not.toHaveBeenCalled()
   })
 
@@ -46,7 +43,7 @@ describe('sendPushForSession', () => {
     db.onQuery('SELECT user_id, name FROM sessions', { user_id: 1, name: 'My Session' })
     db.onQuery('SELECT id, endpoint, key_p256dh, key_auth FROM push_subscriptions', { results: [] })
 
-    await sendPushForSession(db as any, ENV, '1', { role: 'assistant', content: 'hello' })
+    await sendPushForSession(db as any, ENV, '1', { content: 'hello' }, mockSendNotification as any)
     expect(mockSendNotification).not.toHaveBeenCalled()
   })
 
@@ -57,7 +54,7 @@ describe('sendPushForSession', () => {
       results: [{ id: 1, endpoint: 'https://push.example.com', key_p256dh: 'p256', key_auth: 'auth' }]
     })
 
-    await sendPushForSession(db as any, ENV, '1', { role: 'assistant', content: 'hi' })
+    await sendPushForSession(db as any, ENV, '1', { content: 'hi' }, mockSendNotification as any)
 
     const call = mockSendNotification.mock.calls[0]
     expect(call[2]).toEqual(EXPECTED_VAPID_OPTIONS)
@@ -73,7 +70,7 @@ describe('sendPushForSession', () => {
       ]
     })
 
-    await sendPushForSession(db as any, ENV, '5', { role: 'assistant', content: 'hello' })
+    await sendPushForSession(db as any, ENV, '5', { content: 'hello' }, mockSendNotification as any)
 
     expect(mockSendNotification).toHaveBeenCalledTimes(2)
 
@@ -91,7 +88,7 @@ describe('sendPushForSession', () => {
       results: [{ id: 1, endpoint: 'https://push.example.com', key_p256dh: 'p', key_auth: 'a' }]
     })
 
-    await sendPushForSession(db as any, ENV, '42', { role: 'assistant', content: 'Build succeeded' })
+    await sendPushForSession(db as any, ENV, '42', { content: 'Build succeeded' }, mockSendNotification as any)
 
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1])
     expect(payload.title).toBe('Deploy Fix')
@@ -106,7 +103,7 @@ describe('sendPushForSession', () => {
       results: [{ id: 1, endpoint: 'https://push.example.com', key_p256dh: 'p', key_auth: 'a' }]
     })
 
-    await sendPushForSession(db as any, ENV, '7', { role: 'assistant', content: 'hi' })
+    await sendPushForSession(db as any, ENV, '7', { content: 'hi' }, mockSendNotification as any)
 
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1])
     expect(payload.title).toBe('Session 7')
@@ -120,7 +117,7 @@ describe('sendPushForSession', () => {
       results: [{ id: 1, endpoint: 'https://push.example.com', key_p256dh: 'p', key_auth: 'a' }]
     })
 
-    await sendPushForSession(db as any, ENV, '1', { role: 'assistant', content: 'hi' })
+    await sendPushForSession(db as any, ENV, '1', { content: 'hi' }, mockSendNotification as any)
 
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1])
     expect(payload.title).toBe('a'.repeat(100) + '\u2026')
@@ -135,7 +132,7 @@ describe('sendPushForSession', () => {
       results: [{ id: 1, endpoint: 'https://push.example.com', key_p256dh: 'p', key_auth: 'a' }]
     })
 
-    await sendPushForSession(db as any, ENV, '1', { role: 'assistant', content: 'hi' })
+    await sendPushForSession(db as any, ENV, '1', { content: 'hi' }, mockSendNotification as any)
 
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1])
     expect(payload.title).toBe(name)
@@ -149,7 +146,7 @@ describe('sendPushForSession', () => {
     })
 
     const longContent = 'x'.repeat(300)
-    await sendPushForSession(db as any, ENV, '1', { role: 'assistant', content: longContent })
+    await sendPushForSession(db as any, ENV, '1', { content: longContent }, mockSendNotification as any)
 
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1])
     expect(payload.body.length).toBe(201) // 200 chars + ellipsis
@@ -164,7 +161,7 @@ describe('sendPushForSession', () => {
     })
 
     const content = 'x'.repeat(200)
-    await sendPushForSession(db as any, ENV, '1', { role: 'assistant', content })
+    await sendPushForSession(db as any, ENV, '1', { content }, mockSendNotification as any)
 
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1])
     expect(payload.body).toBe(content)
@@ -180,7 +177,7 @@ describe('sendPushForSession', () => {
 
     mockSendNotification.mockRejectedValue({ statusCode: 410 })
 
-    await sendPushForSession(db as any, ENV, '1', { role: 'assistant', content: 'test' })
+    await sendPushForSession(db as any, ENV, '1', { content: 'test' }, mockSendNotification as any)
 
     const deleteCall = db.calls.find((c) => c.sql.includes('DELETE FROM push_subscriptions'))
     expect(deleteCall).toBeTruthy()
@@ -195,10 +192,9 @@ describe('sendPushForSession', () => {
       results: [{ id: 1, endpoint: 'https://push.example.com', key_p256dh: 'p', key_auth: 'a' }]
     })
 
-    const errorSpy = spyOn(console, 'error').mockImplementation(() => {})
     mockSendNotification.mockRejectedValue({ statusCode: 500 })
 
-    await sendPushForSession(db as any, ENV, '1', { role: 'assistant', content: 'test' })
+    await sendPushForSession(db as any, ENV, '1', { content: 'test' }, mockSendNotification as any)
 
     expect(errorSpy).toHaveBeenCalledTimes(1)
     expect(errorSpy.mock.calls[0][0]).toBe('Push notification failed')
@@ -206,8 +202,6 @@ describe('sendPushForSession', () => {
 
     const deleteCall = db.calls.find((c) => c.sql.includes('DELETE FROM push_subscriptions'))
     expect(deleteCall).toBeUndefined()
-
-    errorSpy.mockRestore()
   })
 
   test('does not throw when one subscription fails', async () => {
@@ -220,14 +214,12 @@ describe('sendPushForSession', () => {
       ]
     })
 
-    const errorSpy = spyOn(console, 'error').mockImplementation(() => {})
     mockSendNotification
       .mockRejectedValueOnce(new Error('network failure'))
       .mockResolvedValueOnce({})
 
-    await sendPushForSession(db as any, ENV, '1', { role: 'assistant', content: 'test' })
+    await sendPushForSession(db as any, ENV, '1', { content: 'test' }, mockSendNotification as any)
     expect(mockSendNotification).toHaveBeenCalledTimes(2)
-    errorSpy.mockRestore()
   })
 
   test('queries subscriptions using session owner user_id', async () => {
@@ -235,7 +227,7 @@ describe('sendPushForSession', () => {
     db.onQuery('SELECT user_id, name FROM sessions', { user_id: 42, name: 'Test' })
     db.onQuery('SELECT id, endpoint, key_p256dh, key_auth FROM push_subscriptions', { results: [] })
 
-    await sendPushForSession(db as any, ENV, '1', { role: 'assistant', content: 'test' })
+    await sendPushForSession(db as any, ENV, '1', { content: 'test' }, mockSendNotification as any)
 
     const subQuery = db.calls.find((c) => c.sql.includes('push_subscriptions'))
     expect(subQuery).toBeTruthy()
@@ -248,7 +240,7 @@ describe('sendPushForSession', () => {
     db.onQuery('SELECT user_id, name FROM sessions', { user_id: 1, name: 'Test' })
     db.onQuery('SELECT id, endpoint, key_p256dh, key_auth FROM push_subscriptions', { results: [] })
 
-    await sendPushForSession(db as any, ENV, '1', { role: 'assistant', content: 'test' })
+    await sendPushForSession(db as any, ENV, '1', { content: 'test' }, mockSendNotification as any)
 
     const subQuery = db.calls.find((c) => c.sql.includes('push_subscriptions'))
     expect(subQuery).toBeTruthy()
