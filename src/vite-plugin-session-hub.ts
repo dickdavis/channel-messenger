@@ -227,7 +227,7 @@ export function sessionHub (): Plugin {
       // Bundle the Durable Object class via bun build (closeBundle runs in Vite/Rolldown, not Bun)
       const outfile = join(cfDir, '_session-hub.js')
       try {
-        execSync(`bun build ${hubSrcPath} --outfile ${outfile} --target=browser --format=esm --external cloudflare:workers`, { stdio: 'pipe' })
+        execSync(`bun build ${hubSrcPath} --outfile ${outfile} --target=browser --format=esm --external cloudflare:workers --external web-push`, { stdio: 'pipe' })
       } catch (err) {
         console.error('[session-hub] Failed to bundle:', String(err))
         return
