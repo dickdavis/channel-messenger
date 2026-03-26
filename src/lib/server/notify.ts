@@ -44,7 +44,7 @@ export async function notifyNewMessage (
     notifySessionHub(env.SESSION_HUB, sessionId, message)
   ]
 
-  if (env.VAPID_PUBLIC_KEY !== '' && env.VAPID_PRIVATE_KEY !== '' && env.VAPID_SUBJECT !== '') {
+  if (message.role === 'assistant' && env.VAPID_PUBLIC_KEY !== '' && env.VAPID_PRIVATE_KEY !== '' && env.VAPID_SUBJECT !== '') {
     tasks.push(sendPushForSession(env.DB, env, sessionId, message))
   }
 

@@ -200,8 +200,8 @@ export class SessionHub extends DurableObject<Env> {
     }
     console.log(`[session-hub] Broadcast message ${message.id} to ${broadcastCount}/${sockets.length} clients`)
 
-    // Send push notifications
-    if (this.env.VAPID_PUBLIC_KEY !== '' && this.env.VAPID_PRIVATE_KEY !== '' && this.env.VAPID_SUBJECT !== '') {
+    // Send push notifications only for assistant messages
+    if (role === 'assistant' && this.env.VAPID_PUBLIC_KEY !== '' && this.env.VAPID_PRIVATE_KEY !== '' && this.env.VAPID_SUBJECT !== '') {
       this.ctx.waitUntil(sendPushForSession(db, this.env, sessionId, message))
     }
   }

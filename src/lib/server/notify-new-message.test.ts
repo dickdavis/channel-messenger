@@ -6,8 +6,16 @@ const { notifyNewMessage } = await import('./notify')
 
 const mockSendPushForSession = mock()
 
-const MESSAGE = {
+const ASSISTANT_MESSAGE = {
   id: 1,
+  session_id: 1,
+  role: 'assistant',
+  content: 'hello',
+  created_at: '2025-01-01T00:00:00Z'
+}
+
+const USER_MESSAGE = {
+  id: 2,
   session_id: 1,
   role: 'user',
   content: 'hello',
@@ -36,11 +44,11 @@ describe('notifyNewMessage (dev mode)', () => {
       VAPID_SUBJECT: 'mailto:test@example.com'
     }
 
-    await notifyNewMessage(env as any, '1', MESSAGE, mockSendPushForSession as any)
-    expect(broadcast).toHaveBeenCalledWith('1', MESSAGE)
+    await notifyNewMessage(env as any, '1', ASSISTANT_MESSAGE, mockSendPushForSession as any)
+    expect(broadcast).toHaveBeenCalledWith('1', ASSISTANT_MESSAGE)
   })
 
-  test('sends push notifications in dev mode when VAPID keys are configured', async () => {
+  test('sends push notifications for assistant messages when VAPID keys are configured', async () => {
     const env = {
       SESSION_HUB: {} as any,
       DB: {} as any,
@@ -49,13 +57,26 @@ describe('notifyNewMessage (dev mode)', () => {
       VAPID_SUBJECT: 'mailto:test@example.com'
     }
 
-    await notifyNewMessage(env as any, '1', MESSAGE, mockSendPushForSession as any)
+    await notifyNewMessage(env as any, '1', ASSISTANT_MESSAGE, mockSendPushForSession as any)
     expect(mockSendPushForSession).toHaveBeenCalledWith(
       env.DB,
       env,
       '1',
-      MESSAGE
+      ASSISTANT_MESSAGE
     )
+  })
+
+  test('skips push for user messages', async () => {
+    const env = {
+      SESSION_HUB: {} as any,
+      DB: {} as any,
+      VAPID_PUBLIC_KEY: 'key',
+      VAPID_PRIVATE_KEY: 'secret',
+      VAPID_SUBJECT: 'mailto:test@example.com'
+    }
+
+    await notifyNewMessage(env as any, '1', USER_MESSAGE, mockSendPushForSession as any)
+    expect(mockSendPushForSession).not.toHaveBeenCalled()
   })
 
   test('skips push when VAPID keys are empty', async () => {
@@ -67,7 +88,7 @@ describe('notifyNewMessage (dev mode)', () => {
       VAPID_SUBJECT: ''
     }
 
-    await notifyNewMessage(env as any, '1', MESSAGE, mockSendPushForSession as any)
+    await notifyNewMessage(env as any, '1', ASSISTANT_MESSAGE, mockSendPushForSession as any)
     expect(mockSendPushForSession).not.toHaveBeenCalled()
   })
 })

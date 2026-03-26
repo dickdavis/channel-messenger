@@ -179,10 +179,12 @@ export function sessionHub (): Plugin {
                     }
                   }
 
-                  // Send push notifications
-                  const { sendPushForSession } = await import('./lib/server/push-notify')
-                  if (env.VAPID_PUBLIC_KEY !== '' && env.VAPID_PRIVATE_KEY !== '' && env.VAPID_SUBJECT !== '') {
-                    void sendPushForSession(env.DB, env, sessionId, message)
+                  // Send push notifications only for assistant messages
+                  if (role === 'assistant') {
+                    const { sendPushForSession } = await import('./lib/server/push-notify')
+                    if (env.VAPID_PUBLIC_KEY !== '' && env.VAPID_PRIVATE_KEY !== '' && env.VAPID_SUBJECT !== '') {
+                      void sendPushForSession(env.DB, env, sessionId, message)
+                    }
                   }
                 } catch (err) {
                   console.error('[session-hub] Message handling error:', err)
