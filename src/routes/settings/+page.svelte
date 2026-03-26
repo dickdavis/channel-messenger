@@ -30,7 +30,8 @@
 			const registration = await navigator.serviceWorker.ready;
 			const subscription = await registration.pushManager.getSubscription();
 			pushSubscribed = subscription != null;
-		} catch {
+		} catch (err) {
+			console.error('Failed to check push status:', err);
 			pushSupported = false;
 		}
 	}
@@ -70,7 +71,6 @@
 				const registration = await navigator.serviceWorker.ready;
 				const subscription = await registration.pushManager.getSubscription();
 				if (subscription) {
-					await subscription.unsubscribe();
 					const res = await fetch('/settings/push', {
 						method: 'DELETE',
 						headers: { 'Content-Type': 'application/json' },
@@ -80,6 +80,7 @@
 						errorMessage = 'Failed to remove subscription';
 						return;
 					}
+					await subscription.unsubscribe();
 				}
 				pushSubscribed = false;
 			}

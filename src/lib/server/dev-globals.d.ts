@@ -6,7 +6,7 @@ declare global {
   // eslint-disable-next-line no-var
   var devSessionBroadcast: ((sessionId: string, message: unknown) => void) | undefined
   // eslint-disable-next-line no-var
-  var devPlatformEnv: { DB: D1Database, HMAC_SECRET: string, [key: string]: unknown } | undefined
+  var devPlatformEnv: { DB: D1Database, HMAC_SECRET: string, VAPID_PUBLIC_KEY: string, VAPID_PRIVATE_KEY: string, VAPID_SUBJECT: string, [key: string]: unknown } | undefined
 }
 
 export {}

@@ -7,7 +7,6 @@ interface PushEnv {
 }
 
 interface PushMessage {
-  role: string
   content: string
 }
 

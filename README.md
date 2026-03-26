@@ -110,7 +110,7 @@ Authenticated via `Authorization: Bearer <token>` header.
 | `POST` | `/api/sessions` | Register a new session. Accepts optional `name` in body; returns `id` and `name`. |
 | `GET` | `/api/sessions/:id/messages?since=<timestamp>` | Poll for messages. Use `since` to get only new messages. |
 | `POST` | `/api/sessions/:id/messages` | Send a message as the assistant. Body: `{ "content": "..." }` |
-| `GET` | `/api/ws/sessions/:id` | WebSocket upgrade. Authenticate by sending `{"type":"auth","token":"<token>"}` as the first message within 5 seconds. Receives `{"type":"message","message":{...}}` on new messages. |
+| `GET` | `/api/ws/sessions/:id` | WebSocket upgrade. Authenticate by sending `{"type":"auth","token":"<token>"}` as the first message within 5 seconds. Send messages with `{"type":"message","content":"..."}`. Receives `{"type":"message","message":{...}}` on new messages. |
 
 ### Auth routes (browser)
 

@@ -1,10 +1,14 @@
 import { DurableObject } from 'cloudflare:workers'
 import { verifyToken } from '../auth'
 import { verifySession } from '../session'
+import { sendPushForSession } from './push-notify'
 
 interface Env {
   DB: D1Database
   HMAC_SECRET: string
+  VAPID_PUBLIC_KEY: string
+  VAPID_PRIVATE_KEY: string
+  VAPID_SUBJECT: string
 }
 
 interface BroadcastPayload {
@@ -17,6 +21,7 @@ interface BroadcastPayload {
 
 interface SocketAttachment {
   authenticated: boolean
+  authType?: 'cookie' | 'token'
   userId?: number
   sessionId?: string
 }
@@ -58,7 +63,7 @@ export class SessionHub extends DurableObject<Env> {
     if (user != null) {
       const owns = sessionId != null && await this.verifyOwnership(sessionId, user.id)
       if (owns) {
-        server.serializeAttachment({ authenticated: true, userId: user.id, sessionId })
+        server.serializeAttachment({ authenticated: true, authType: 'cookie', userId: user.id, sessionId })
         server.send(JSON.stringify({ type: 'auth', status: 'ok' }))
         return new Response(null, { status: 101, webSocket: client })
       }
@@ -110,7 +115,7 @@ export class SessionHub extends DurableObject<Env> {
   async webSocketMessage (ws: WebSocket, data: string | ArrayBuffer): Promise<void> {
     if (typeof data !== 'string') return
 
-    let parsed: { type: string, token?: string }
+    let parsed: { type: string, token?: string, content?: string }
     try {
       parsed = JSON.parse(data)
     } catch {
@@ -136,8 +141,57 @@ export class SessionHub extends DurableObject<Env> {
         }
       }
 
-      ws.serializeAttachment({ authenticated: true, userId: result.userId, sessionId })
+      ws.serializeAttachment({ authenticated: true, authType: 'token', userId: result.userId, sessionId })
       ws.send(JSON.stringify({ type: 'auth', status: 'ok' }))
+      return
+    }
+
+    if (parsed.type === 'message' && typeof parsed.content === 'string' && parsed.content !== '') {
+      await this.handleIncomingMessage(ws, parsed.content)
+    }
+  }
+
+  async handleIncomingMessage (ws: WebSocket, content: string): Promise<void> {
+    const attachment: SocketAttachment | null = ws.deserializeAttachment()
+    if (attachment?.authenticated !== true || attachment.sessionId == null) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }))
+      return
+    }
+
+    const sessionId = attachment.sessionId
+    const role = attachment.authType === 'cookie' ? 'user' : 'assistant'
+    const db = this.env.DB
+
+    const result = await db
+      .prepare('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)')
+      .bind(sessionId, role, content)
+      .run()
+
+    await db
+      .prepare("UPDATE sessions SET updated_at = datetime('now') WHERE id = ?")
+      .bind(sessionId)
+      .run()
+
+    const message: BroadcastPayload = {
+      id: result.meta.last_row_id,
+      session_id: Number(sessionId),
+      role,
+      content,
+      created_at: new Date().toISOString()
+    }
+
+    // Broadcast to all connected clients on this session
+    const payload = JSON.stringify({ type: 'message', message })
+    for (const client of this.ctx.getWebSockets()) {
+      const clientAttachment: SocketAttachment | null = client.deserializeAttachment()
+      if (clientAttachment?.authenticated === true && clientAttachment.sessionId === sessionId) {
+        client.send(payload)
+      }
+    }
+
+    // Send push notifications
+    if (this.env.VAPID_PUBLIC_KEY !== '' && this.env.VAPID_PRIVATE_KEY !== '' && this.env.VAPID_SUBJECT !== '') {
+      this.ctx.waitUntil(sendPushForSession(db, this.env, sessionId, message))
     }
   }
 

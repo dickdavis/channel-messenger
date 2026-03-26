@@ -25,7 +25,7 @@ export function sessionHub (): Plugin {
       const sessions = new Map<string, Set<WebSocket>>()
 
       // Wait for the adapter's platform env to be shared via hooks.server.ts
-      async function getPlatformEnv (): Promise<{ DB: D1Database, HMAC_SECRET: string }> {
+      async function getPlatformEnv (): Promise<{ DB: D1Database, HMAC_SECRET: string, VAPID_PUBLIC_KEY: string, VAPID_PRIVATE_KEY: string, VAPID_SUBJECT: string, [key: string]: unknown }> {
         // The adapter's getPlatformProxy() makes env available on first request.
         // Poll briefly — the WebSocket auth message arrives after the session
         // creation HTTP request, so the env should already be set.
@@ -52,6 +52,7 @@ export function sessionHub (): Plugin {
 
         wss.handleUpgrade(req, socket, head, (ws) => {
           let authenticated = false
+          let authType: 'cookie' | 'token' | null = null
 
           const timeout = setTimeout(() => {
             if (!authenticated) {
@@ -84,6 +85,7 @@ export function sessionHub (): Plugin {
 
               const owns = await verifyOwnership(env.DB, sessionId, user.id)
               if (owns) {
+                authType = 'cookie'
                 markAuthenticated()
               } else {
                 // Valid cookie but wrong session — reject immediately
@@ -96,45 +98,96 @@ export function sessionHub (): Plugin {
             }
           })()
 
-          // Token auth fallback via message
+          // Handle incoming messages (auth + content)
           const onMessage = (data: Buffer | string): void => {
             void (async () => {
-              // Wait for cookie auth to settle before attempting token auth
-              await cookieAuthDone
-              if (authenticated) return
-
-              let parsed: { type: string, token?: string }
+              let parsed: { type: string, token?: string, content?: string }
               try {
                 parsed = JSON.parse(String(data))
               } catch {
                 return
               }
 
-              if (parsed.type !== 'auth' || typeof parsed.token !== 'string') return
+              // Auth message
+              if (parsed.type === 'auth' && typeof parsed.token === 'string') {
+                // Wait for cookie auth to settle before attempting token auth
+                await cookieAuthDone
+                if (authenticated) return
 
-              try {
-                const env = await getPlatformEnv()
-                const { verifyToken } = await import('./lib/auth')
-                const result = await verifyToken(env.DB, env.HMAC_SECRET, parsed.token)
+                try {
+                  const env = await getPlatformEnv()
+                  const { verifyToken } = await import('./lib/auth')
+                  const result = await verifyToken(env.DB, env.HMAC_SECRET, parsed.token)
 
-                if (result == null) {
-                  ws.send(JSON.stringify({ type: 'error', message: 'Invalid token' }))
-                  ws.close(4003, 'Invalid token')
+                  if (result == null) {
+                    ws.send(JSON.stringify({ type: 'error', message: 'Invalid token' }))
+                    ws.close(4003, 'Invalid token')
+                    return
+                  }
+
+                  const owns = await verifyOwnership(env.DB, sessionId, result.userId)
+                  if (!owns) {
+                    ws.send(JSON.stringify({ type: 'error', message: 'Forbidden' }))
+                    ws.close(4003, 'Forbidden')
+                    return
+                  }
+
+                  authType = 'token'
+                  markAuthenticated()
+                } catch (err) {
+                  console.error('[session-hub] Auth error:', err)
+                  ws.send(JSON.stringify({ type: 'error', message: 'Internal error' }))
+                  ws.close(1011, 'Internal error')
+                }
+                return
+              }
+
+              // Content message
+              if (parsed.type === 'message' && typeof parsed.content === 'string' && parsed.content !== '') {
+                if (!authenticated) {
+                  ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }))
                   return
                 }
 
-                const owns = await verifyOwnership(env.DB, sessionId, result.userId)
-                if (!owns) {
-                  ws.send(JSON.stringify({ type: 'error', message: 'Forbidden' }))
-                  ws.close(4003, 'Forbidden')
-                  return
-                }
+                try {
+                  const role = authType === 'cookie' ? 'user' : 'assistant'
+                  const env = await getPlatformEnv()
+                  const result = await env.DB
+                    .prepare('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)')
+                    .bind(sessionId, role, parsed.content)
+                    .run()
 
-                markAuthenticated()
-              } catch (err) {
-                console.error('[session-hub] Auth error:', err)
-                ws.send(JSON.stringify({ type: 'error', message: 'Internal error' }))
-                ws.close(1011, 'Internal error')
+                  await env.DB
+                    .prepare("UPDATE sessions SET updated_at = datetime('now') WHERE id = ?")
+                    .bind(sessionId)
+                    .run()
+
+                  const message = {
+                    id: result.meta.last_row_id,
+                    session_id: Number(sessionId),
+                    role,
+                    content: parsed.content,
+                    created_at: new Date().toISOString()
+                  }
+
+                  // Broadcast to all connected clients for this session
+                  const payload = JSON.stringify({ type: 'message', message })
+                  const sockets = sessions.get(sessionId)
+                  if (sockets != null) {
+                    for (const client of sockets) {
+                      client.send(payload)
+                    }
+                  }
+
+                  // Send push notifications
+                  const { sendPushForSession } = await import('./lib/server/push-notify')
+                  if (env.VAPID_PUBLIC_KEY !== '' && env.VAPID_PRIVATE_KEY !== '' && env.VAPID_SUBJECT !== '') {
+                    void sendPushForSession(env.DB, env, sessionId, message)
+                  }
+                } catch (err) {
+                  console.error('[session-hub] Message handling error:', err)
+                  ws.send(JSON.stringify({ type: 'error', message: 'Failed to send message' }))
+                }
               }
             })()
           }
