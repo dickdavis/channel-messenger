@@ -18,6 +18,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
       name: string | null
       created_at: string
       revoked_at: string | null
-    }>
+    }>,
+    vapidPublicKey: (platform as App.Platform).env.VAPID_PUBLIC_KEY ?? ''
   }
 }

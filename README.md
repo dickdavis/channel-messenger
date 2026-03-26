@@ -59,6 +59,24 @@ Then update `ALLOWED_GITHUB_IDS` in `.dev.vars` with your GitHub user ID (see be
 bun run db:migrate
 ```
 
+### Push notifications (optional)
+
+Generate a VAPID key pair:
+
+```sh
+bunx web-push generate-vapid-keys
+```
+
+Add the public key to `.dev.vars`:
+
+```
+VAPID_PUBLIC_KEY=<your public key>
+VAPID_PRIVATE_KEY=<your private key>
+VAPID_SUBJECT=mailto:<your email>
+```
+
+Push notifications work both locally and in production. On Safari/WebKit, the app must be installed as a PWA (Add to Dock) for push to work.
+
 ### Run the dev server
 
 ```sh
@@ -111,6 +129,8 @@ Authenticated via session cookie. Used by the UI only.
 | `POST` | `/settings/keys` | Generate a new API key |
 | `GET` | `/settings/keys` | List API keys |
 | `DELETE` | `/settings/keys/:id` | Revoke an API key |
+| `POST` | `/settings/push` | Subscribe to push notifications |
+| `DELETE` | `/settings/push` | Unsubscribe from push notifications |
 | `GET` | `/sessions/:id/messages` | Poll for messages |
 | `POST` | `/sessions/:id/messages` | Send a message as the user. Body: `{ "content": "..." }` |
 
@@ -133,9 +153,13 @@ Authenticated via session cookie. Used by the UI only.
    bunx wrangler secret put HMAC_SECRET
    bunx wrangler secret put GITHUB_CLIENT_ID
    bunx wrangler secret put GITHUB_CLIENT_SECRET
+   bunx wrangler secret put VAPID_PRIVATE_KEY
    ```
 
-4. Set `ALLOWED_GITHUB_IDS` as a plaintext environment variable in the Cloudflare dashboard under Workers & Pages > your worker > Settings > Variables. Value is a comma-separated list of GitHub user IDs.
+4. Set plaintext environment variables in the Cloudflare dashboard under Workers & Pages > your worker > Settings > Variables:
+   - `ALLOWED_GITHUB_IDS` — comma-separated list of GitHub user IDs
+   - `VAPID_PUBLIC_KEY` — the public key from `bunx web-push generate-vapid-keys`
+   - `VAPID_SUBJECT` — `mailto:<your email>`
 
 5. Create a production GitHub OAuth App at https://github.com/settings/developers:
    - **Homepage URL**: `https://<your-domain>`

@@ -1,5 +1,5 @@
 import { json, error } from '@sveltejs/kit'
-import { notifySessionHub } from '$lib/server/notify'
+import { notifyNewMessage } from '$lib/server/notify'
 import type { RequestHandler } from './$types'
 
 // GET /sessions/:id/messages — poll for messages (browser)
@@ -74,7 +74,7 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 
   const env = (platform as App.Platform).env
   ;(platform as App.Platform).context.waitUntil(
-    notifySessionHub(env.SESSION_HUB, params.id, {
+    notifyNewMessage(env, params.id, {
       id: result.meta.last_row_id,
       session_id: Number(params.id),
       role: 'user',

@@ -205,7 +205,7 @@ export function defineMessagesRouteTests (config: MessagesTestConfig): void {
       expect(insertCall.bindings[2]).toBe('hello world')
     })
 
-    test('calls waitUntil with notifySessionHub', async () => {
+    test('calls waitUntil with notifyNewMessage', async () => {
       const db = new MockD1Database()
       db.onQuery('SELECT id FROM sessions', { id: 1 })
       db.onQuery('INSERT INTO messages', { meta: { last_row_id: 1, changes: 1 } })

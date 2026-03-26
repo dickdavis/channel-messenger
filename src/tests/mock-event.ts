@@ -68,7 +68,10 @@ export function mockRequestEvent (options: MockEventOptions = {}) {
         GITHUB_CLIENT_ID: 'test-client-id',
         GITHUB_CLIENT_SECRET: 'test-client-secret',
         SESSION_HUB: sessionHub ?? {},
-        ALLOWED_GITHUB_IDS: ''
+        ALLOWED_GITHUB_IDS: '',
+        VAPID_PUBLIC_KEY: 'test-vapid-public-key',
+        VAPID_PRIVATE_KEY: 'test-vapid-private-key',
+        VAPID_SUBJECT: 'mailto:test@example.com'
       },
       context: {
         waitUntil: mock(() => {})

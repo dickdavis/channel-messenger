@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
+	import { urlBase64ToUint8Array } from '$lib/push-utils';
 	import ApiKeyRow from '$lib/components/ApiKeyRow.svelte';
 
 	type ApiKey = { id: number; name: string | null; created_at: string; revoked_at: string | null };
@@ -11,9 +12,84 @@
 	let generatedToken: string | null = $state(null);
 	let errorMessage: string | null = $state(null);
 
+	let pushSupported = $state(false);
+	let pushSubscribed = $state(false);
+	let pushLoading = $state(false);
+	let isStandalone = $state(false);
+
 	onMount(() => {
 		keys = data.keys;
+		isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+		checkPushStatus();
 	});
+
+	async function checkPushStatus() {
+		if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+		pushSupported = true;
+		try {
+			const registration = await navigator.serviceWorker.ready;
+			const subscription = await registration.pushManager.getSubscription();
+			pushSubscribed = subscription != null;
+		} catch {
+			pushSupported = false;
+		}
+	}
+
+	async function togglePush() {
+		if (pushLoading) return;
+		pushLoading = true;
+		errorMessage = null;
+		try {
+			if (!pushSubscribed) {
+				const permission = await Notification.requestPermission();
+				if (permission !== 'granted') {
+					errorMessage = 'Notification permission denied';
+					return;
+				}
+				const registration = await navigator.serviceWorker.ready;
+				const subscription = await registration.pushManager.subscribe({
+					userVisibleOnly: true,
+					applicationServerKey: urlBase64ToUint8Array(data.vapidPublicKey) as BufferSource
+				});
+				const sub = subscription.toJSON();
+				const res = await fetch('/settings/push', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						endpoint: sub.endpoint,
+						keys: sub.keys
+					})
+				});
+				if (!res.ok) {
+					errorMessage = 'Failed to save subscription';
+					await subscription.unsubscribe();
+					return;
+				}
+				pushSubscribed = true;
+			} else {
+				const registration = await navigator.serviceWorker.ready;
+				const subscription = await registration.pushManager.getSubscription();
+				if (subscription) {
+					await subscription.unsubscribe();
+					const res = await fetch('/settings/push', {
+						method: 'DELETE',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ endpoint: subscription.endpoint })
+					});
+					if (!res.ok) {
+						errorMessage = 'Failed to remove subscription';
+						return;
+					}
+				}
+				pushSubscribed = false;
+			}
+		} catch (err) {
+			console.error('Push notification toggle failed:', err);
+			errorMessage = 'Failed to update notification settings';
+		} finally {
+			pushLoading = false;
+		}
+	}
 
 	async function createKey() {
 		errorMessage = null;
@@ -57,6 +133,36 @@
 	</header>
 
 	<div class="content">
+		{#if data.vapidPublicKey}
+			<section>
+				<h2>Notifications</h2>
+				{#if pushSupported && isStandalone}
+					<p class="description">
+						Receive push notifications when new messages arrive in your sessions.
+					</p>
+					<button
+						class="push-toggle"
+						class:active={pushSubscribed}
+						onclick={togglePush}
+						disabled={pushLoading}
+					>
+						<span class="toggle-track">
+							<span class="toggle-thumb"></span>
+						</span>
+						<span>{pushSubscribed ? 'Enabled' : 'Disabled'}</span>
+					</button>
+				{:else}
+					<p class="description">
+						Install this app as a PWA to enable push notifications.
+					</p>
+				{/if}
+			</section>
+		{/if}
+
+		{#if errorMessage}
+			<div class="error">{errorMessage}</div>
+		{/if}
+
 		<section>
 			<h2>API Keys</h2>
 			<p class="description">
@@ -237,5 +343,64 @@
 		text-align: center;
 		color: var(--color-text-dim);
 		margin-top: 20px;
+	}
+
+	section + section {
+		margin-top: 32px;
+	}
+
+	.push-toggle {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 0;
+		font-size: var(--text-md);
+		font-family: inherit;
+		color: var(--color-text);
+	}
+
+	.push-toggle:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.toggle-track {
+		display: flex;
+		align-items: center;
+		width: 44px;
+		height: 24px;
+		background: var(--color-bg-raised);
+		border-radius: 12px;
+		padding: 2px;
+		transition: var(--transition);
+	}
+
+	.push-toggle.active .toggle-track {
+		background: var(--color-primary);
+	}
+
+	.toggle-thumb {
+		width: 20px;
+		height: 20px;
+		background: #fff;
+		border-radius: 50%;
+		transition: var(--transition);
+		transform: translateX(0);
+	}
+
+	.push-toggle.active .toggle-thumb {
+		transform: translateX(20px);
+	}
+
+	.error {
+		background: var(--color-warning);
+		color: #fff;
+		padding: 8px 12px;
+		border-radius: var(--radius-md);
+		font-size: var(--text-base);
+		margin-bottom: 16px;
 	}
 </style>
