@@ -1,5 +1,5 @@
 import { dev } from '$app/environment'
-import { sendPushForSession } from './push-notify'
+import { sendPushForSession as defaultSendPush } from './push-notify'
 
 interface MessagePayload {
   id: number | null
@@ -8,6 +8,8 @@ interface MessagePayload {
   content: string
   created_at: string
 }
+
+type PushSender = (db: D1Database, env: { VAPID_SUBJECT: string, VAPID_PUBLIC_KEY: string, VAPID_PRIVATE_KEY: string }, sessionId: string, message: { content: string }) => Promise<void>
 
 export async function notifySessionHub (
   sessionHub: DurableObjectNamespace,
@@ -35,7 +37,8 @@ export async function notifySessionHub (
 export async function notifyNewMessage (
   env: App.Platform['env'],
   sessionId: string,
-  message: MessagePayload
+  message: MessagePayload,
+  sendPushForSession: PushSender = defaultSendPush
 ): Promise<void> {
   const tasks: Array<Promise<void>> = [
     notifySessionHub(env.SESSION_HUB, sessionId, message)

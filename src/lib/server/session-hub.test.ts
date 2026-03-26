@@ -4,7 +4,6 @@ import { MockD1Database } from '../../tests/mock-d1'
 // Mock external dependencies
 const mockVerifyToken = mock()
 const mockVerifySession = mock()
-const mockSendPushForSession = mock()
 
 void mock.module('../auth', () => ({
   verifyToken: mockVerifyToken
@@ -12,10 +11,6 @@ void mock.module('../auth', () => ({
 
 void mock.module('../session', () => ({
   verifySession: mockVerifySession
-}))
-
-void mock.module('./push-notify', () => ({
-  sendPushForSession: mockSendPushForSession
 }))
 
 void mock.module('cloudflare:workers', () => ({
@@ -69,8 +64,6 @@ describe('SessionHub.webSocketMessage', () => {
   beforeEach(() => {
     mockVerifyToken.mockReset()
     mockVerifySession.mockReset()
-    mockSendPushForSession.mockReset()
-    mockSendPushForSession.mockResolvedValue(undefined)
   })
 
   test('ignores non-string data', async () => {

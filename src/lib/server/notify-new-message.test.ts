@@ -2,12 +2,9 @@ import { describe, expect, test, mock, afterEach, beforeEach } from 'bun:test'
 
 void mock.module('$app/environment', () => ({ dev: true }))
 
-const mockSendPushForSession = mock()
-void mock.module('./push-notify', () => ({
-  sendPushForSession: mockSendPushForSession
-}))
-
 const { notifyNewMessage } = await import('./notify')
+
+const mockSendPushForSession = mock()
 
 const MESSAGE = {
   id: 1,
@@ -39,7 +36,7 @@ describe('notifyNewMessage (dev mode)', () => {
       VAPID_SUBJECT: 'mailto:test@example.com'
     }
 
-    await notifyNewMessage(env as any, '1', MESSAGE)
+    await notifyNewMessage(env as any, '1', MESSAGE, mockSendPushForSession as any)
     expect(broadcast).toHaveBeenCalledWith('1', MESSAGE)
   })
 
@@ -52,7 +49,7 @@ describe('notifyNewMessage (dev mode)', () => {
       VAPID_SUBJECT: 'mailto:test@example.com'
     }
 
-    await notifyNewMessage(env as any, '1', MESSAGE)
+    await notifyNewMessage(env as any, '1', MESSAGE, mockSendPushForSession as any)
     expect(mockSendPushForSession).toHaveBeenCalledWith(
       env.DB,
       env,
@@ -70,7 +67,7 @@ describe('notifyNewMessage (dev mode)', () => {
       VAPID_SUBJECT: ''
     }
 
-    await notifyNewMessage(env as any, '1', MESSAGE)
+    await notifyNewMessage(env as any, '1', MESSAGE, mockSendPushForSession as any)
     expect(mockSendPushForSession).not.toHaveBeenCalled()
   })
 })

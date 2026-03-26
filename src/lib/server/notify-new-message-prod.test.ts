@@ -2,12 +2,9 @@ import { describe, expect, test, mock, beforeEach } from 'bun:test'
 
 void mock.module('$app/environment', () => ({ dev: false }))
 
-const mockSendPushForSession = mock()
-void mock.module('./push-notify', () => ({
-  sendPushForSession: mockSendPushForSession
-}))
-
 const { notifyNewMessage } = await import('./notify')
+
+const mockSendPushForSession = mock()
 
 const MESSAGE = {
   id: 1,
@@ -45,7 +42,7 @@ describe('notifyNewMessage (production mode)', () => {
   test('calls both notifySessionHub and sendPushForSession', async () => {
     const { mockFetch, env } = makeEnv()
 
-    await notifyNewMessage(env as any, '1', MESSAGE)
+    await notifyNewMessage(env as any, '1', MESSAGE, mockSendPushForSession as any)
 
     // WebSocket notification was sent
     expect(mockFetch).toHaveBeenCalled()
@@ -61,21 +58,21 @@ describe('notifyNewMessage (production mode)', () => {
   test('skips push when VAPID_PUBLIC_KEY is empty', async () => {
     const { env } = makeEnv({ VAPID_PUBLIC_KEY: '' })
 
-    await notifyNewMessage(env as any, '1', MESSAGE)
+    await notifyNewMessage(env as any, '1', MESSAGE, mockSendPushForSession as any)
     expect(mockSendPushForSession).not.toHaveBeenCalled()
   })
 
   test('skips push when VAPID_PRIVATE_KEY is empty', async () => {
     const { env } = makeEnv({ VAPID_PRIVATE_KEY: '' })
 
-    await notifyNewMessage(env as any, '1', MESSAGE)
+    await notifyNewMessage(env as any, '1', MESSAGE, mockSendPushForSession as any)
     expect(mockSendPushForSession).not.toHaveBeenCalled()
   })
 
   test('skips push when VAPID_SUBJECT is empty', async () => {
     const { env } = makeEnv({ VAPID_SUBJECT: '' })
 
-    await notifyNewMessage(env as any, '1', MESSAGE)
+    await notifyNewMessage(env as any, '1', MESSAGE, mockSendPushForSession as any)
     expect(mockSendPushForSession).not.toHaveBeenCalled()
   })
 
@@ -84,7 +81,7 @@ describe('notifyNewMessage (production mode)', () => {
     mockSendPushForSession.mockRejectedValue(new Error('push failed'))
 
     // Should not throw — uses Promise.allSettled
-    await notifyNewMessage(env as any, '1', MESSAGE)
+    await notifyNewMessage(env as any, '1', MESSAGE, mockSendPushForSession as any)
   })
 
   test('does not throw when WebSocket notification fails', async () => {
@@ -93,13 +90,13 @@ describe('notifyNewMessage (production mode)', () => {
     env.SESSION_HUB.get = mock(() => ({ fetch: mockFetch }))
 
     // Should not throw — uses Promise.allSettled
-    await notifyNewMessage(env as any, '1', MESSAGE)
+    await notifyNewMessage(env as any, '1', MESSAGE, mockSendPushForSession as any)
   })
 
   test('passes correct session ID to both notification paths', async () => {
     const { env } = makeEnv()
 
-    await notifyNewMessage(env as any, '42', MESSAGE)
+    await notifyNewMessage(env as any, '42', MESSAGE, mockSendPushForSession as any)
 
     // WebSocket path uses session-{id}
     expect(env.SESSION_HUB.idFromName).toHaveBeenCalledWith('session-42')
