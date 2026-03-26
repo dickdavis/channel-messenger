@@ -147,7 +147,12 @@ export class SessionHub extends DurableObject<Env> {
     }
 
     if (parsed.type === 'message' && typeof parsed.content === 'string' && parsed.content !== '') {
-      await this.handleIncomingMessage(ws, parsed.content)
+      try {
+        await this.handleIncomingMessage(ws, parsed.content)
+      } catch (err) {
+        console.error('[session-hub] handleIncomingMessage error:', err)
+        ws.send(JSON.stringify({ type: 'error', message: 'Failed to send message' }))
+      }
     }
   }
 
@@ -161,6 +166,8 @@ export class SessionHub extends DurableObject<Env> {
     const sessionId = attachment.sessionId
     const role = attachment.authType === 'cookie' ? 'user' : 'assistant'
     const db = this.env.DB
+
+    console.log(`[session-hub] Incoming WS message: session=${sessionId} role=${role} len=${content.length}`)
 
     const result = await db
       .prepare('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)')
@@ -181,13 +188,17 @@ export class SessionHub extends DurableObject<Env> {
     }
 
     // Broadcast to all connected clients on this session
+    const sockets = this.ctx.getWebSockets()
     const payload = JSON.stringify({ type: 'message', message })
-    for (const client of this.ctx.getWebSockets()) {
+    let broadcastCount = 0
+    for (const client of sockets) {
       const clientAttachment: SocketAttachment | null = client.deserializeAttachment()
       if (clientAttachment?.authenticated === true && clientAttachment.sessionId === sessionId) {
         client.send(payload)
+        broadcastCount++
       }
     }
+    console.log(`[session-hub] Broadcast message ${message.id} to ${broadcastCount}/${sockets.length} clients`)
 
     // Send push notifications
     if (this.env.VAPID_PUBLIC_KEY !== '' && this.env.VAPID_PRIVATE_KEY !== '' && this.env.VAPID_SUBJECT !== '') {
