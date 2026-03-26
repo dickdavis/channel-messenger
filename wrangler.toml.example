@@ -6,9 +6,10 @@ workers_dev = false
 preview_urls = false
 
 [vars]
-# VAPID_SUBJECT = "mailto:your@email.com"
-# VAPID_PUBLIC_KEY = "" # Set after running: bunx web-push generate-vapid-keys
-# VAPID_PRIVATE_KEY is set via: wrangler secret put VAPID_PRIVATE_KEY
+# Push notifications require three secrets:
+#   wrangler secret put VAPID_SUBJECT       (e.g. mailto:you@example.com)
+#   wrangler secret put VAPID_PUBLIC_KEY    (generate with: bunx web-push generate-vapid-keys)
+#   wrangler secret put VAPID_PRIVATE_KEY
 
 [assets]
 binding = "ASSETS"
