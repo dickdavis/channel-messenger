@@ -39,6 +39,7 @@
 		gap: 8px;
 		margin-left: auto;
 		width: 75%;
+		box-sizing: border-box;
 	}
 
 	@media (max-width: 640px) {
