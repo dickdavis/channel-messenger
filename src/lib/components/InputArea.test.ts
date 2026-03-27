@@ -3,19 +3,18 @@ import { render, screen, fireEvent } from '@testing-library/svelte'
 import InputArea from './InputArea.svelte'
 
 describe('InputArea', () => {
-  test('renders textarea and send button', () => {
+  test('renders textarea', () => {
     render(InputArea, { props: { onSend: mock() } })
     expect(screen.getByPlaceholderText('Type a message...')).toBeTruthy()
-    expect(screen.getByText('Send')).toBeTruthy()
   })
 
-  test('calls onSend with trimmed content when form is submitted', async () => {
+  test('calls onSend with trimmed content when Enter is pressed', async () => {
     const onSend = mock()
     render(InputArea, { props: { onSend } })
 
     const textarea = screen.getByPlaceholderText('Type a message...')
     await fireEvent.input(textarea, { target: { value: '  hello world  ' } })
-    await fireEvent.click(screen.getByText('Send'))
+    await fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
 
     expect(onSend).toHaveBeenCalledWith('hello world')
   })
@@ -24,7 +23,8 @@ describe('InputArea', () => {
     const onSend = mock()
     render(InputArea, { props: { onSend } })
 
-    await fireEvent.click(screen.getByText('Send'))
+    const textarea = screen.getByPlaceholderText('Type a message...')
+    await fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
     expect(onSend).not.toHaveBeenCalled()
   })
 
@@ -34,7 +34,7 @@ describe('InputArea', () => {
 
     const textarea = screen.getByPlaceholderText('Type a message...')
     await fireEvent.input(textarea, { target: { value: '   ' } })
-    await fireEvent.click(screen.getByText('Send'))
+    await fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
 
     expect(onSend).not.toHaveBeenCalled()
   })
@@ -45,20 +45,9 @@ describe('InputArea', () => {
 
     const textarea = screen.getByPlaceholderText('Type a message...')
     await fireEvent.input(textarea, { target: { value: 'hello' } })
-    await fireEvent.click(screen.getByText('Send'))
-
-    expect((textarea as HTMLTextAreaElement).value).toBe('')
-  })
-
-  test('Enter key submits the message', async () => {
-    const onSend = mock()
-    render(InputArea, { props: { onSend } })
-
-    const textarea = screen.getByPlaceholderText('Type a message...')
-    await fireEvent.input(textarea, { target: { value: 'hello' } })
     await fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
 
-    expect(onSend).toHaveBeenCalledWith('hello')
+    expect((textarea as HTMLTextAreaElement).value).toBe('')
   })
 
   test('Shift+Enter does not submit', async () => {

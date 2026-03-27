@@ -1,6 +1,17 @@
 <script lang="ts">
 	let { onSend }: { onSend: (content: string) => void } = $props();
 	let input = $state('');
+	let textarea: HTMLTextAreaElement;
+
+	function resize() {
+		textarea.style.height = 'auto'
+		textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'
+	}
+
+	$effect(() => {
+		input;
+		resize();
+	});
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && !e.shiftKey) {
@@ -20,12 +31,12 @@
 <div class="input-border"></div>
 <form class="input-area" onsubmit={(e) => { e.preventDefault(); submit(); }}>
 	<textarea
+		bind:this={textarea}
 		bind:value={input}
 		onkeydown={handleKeydown}
 		placeholder="Type a message..."
 		rows="1"
 	></textarea>
-	<button type="submit">Send</button>
 </form>
 
 <style>
@@ -36,7 +47,6 @@
 	.input-area {
 		display: flex;
 		padding: 8px 16px;
-		gap: 8px;
 		margin-left: auto;
 		width: 75%;
 		box-sizing: border-box;
@@ -54,6 +64,7 @@
 		border: 1px solid var(--color-bg-raised);
 		border-radius: var(--radius-pill);
 		resize: none;
+		overflow-y: auto;
 		font-size: var(--text-lg);
 		font-family: inherit;
 		outline: none;
@@ -69,26 +80,4 @@
 		border-color: var(--color-primary);
 	}
 
-	button {
-		padding: 10px 20px;
-		background: var(--color-primary);
-		color: #fff;
-		border: none;
-		border-radius: var(--radius-pill);
-		cursor: pointer;
-		font-size: var(--text-lg);
-		font-family: var(--font-mono);
-		font-weight: 600;
-		transition: var(--transition);
-		box-shadow: var(--shadow-btn);
-	}
-
-	button:hover {
-		background: var(--color-primary-hover);
-		box-shadow: var(--shadow-btn-hover);
-	}
-
-	button:active {
-		transform: scale(0.95);
-	}
 </style>
