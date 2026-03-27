@@ -41,6 +41,12 @@
 		width: 75%;
 	}
 
+	@media (max-width: 640px) {
+		.input-area {
+			width: 100%;
+		}
+	}
+
 	textarea {
 		flex: 1;
 		padding: 10px;
