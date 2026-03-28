@@ -60,4 +60,16 @@ describe('InputArea', () => {
 
     expect(onSend).not.toHaveBeenCalled()
   })
+
+  test('Escape blurs the textarea', async () => {
+    render(InputArea, { props: { onSend: mock() } })
+
+    const textarea = screen.getByPlaceholderText('Type a message...')
+    textarea.focus()
+    expect(document.activeElement).toBe(textarea)
+
+    await fireEvent.keyDown(textarea, { key: 'Escape' })
+
+    expect(document.activeElement).not.toBe(textarea)
+  })
 })

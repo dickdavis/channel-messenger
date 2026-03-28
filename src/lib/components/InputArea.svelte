@@ -18,6 +18,9 @@
 			e.preventDefault();
 			submit();
 		}
+		if (e.key === 'Escape') {
+			textarea.blur();
+		}
 	}
 
 	function submit() {
