@@ -72,4 +72,16 @@ describe('InputArea', () => {
 
     expect(document.activeElement).not.toBe(textarea)
   })
+
+  test('exposes focus() method', () => {
+    const result = render(InputArea, { props: { onSend: mock() } })
+    const component = result.component as unknown as { focus: () => void }
+
+    const textarea = screen.getByPlaceholderText('Type a message...')
+    expect(document.activeElement).not.toBe(textarea)
+
+    component.focus()
+
+    expect(document.activeElement).toBe(textarea)
+  })
 })

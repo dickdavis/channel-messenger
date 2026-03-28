@@ -13,6 +13,10 @@
 		resize();
 	});
 
+	export function focus () {
+		textarea.focus();
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
