@@ -4,6 +4,8 @@
 	import MessageBubble from '$lib/components/MessageBubble.svelte';
 	import InputArea from '$lib/components/InputArea.svelte';
 	import SessionList from '$lib/components/SessionList.svelte';
+	import NewMessagesToast from '$lib/components/NewMessagesToast.svelte';
+	import PullToRefreshIndicator from '$lib/components/PullToRefreshIndicator.svelte';
 	import { createSessionSocket, type Message } from '$lib/ws';
 
 	type Session = { id: number; name: string; status: string; created_at: string };
@@ -12,24 +14,15 @@
 	let sessions: Session[] = $state([]);
 	let activeSessionId: number | null = $state(null);
 	let messages: Message[] = $state([]);
-	let lastMessageCount = 0;
-	let hasNewMessages = $state(false);
 	let sidebarOpen = $state(false);
-	let chatContainer: HTMLElement;
+	let chatContainer: HTMLElement | undefined = $state();
 	let socketCleanup: (() => void) | null = null;
 	let selectGeneration = 0;
 
 	function scrollToBottom() {
 		if (chatContainer) {
 			chatContainer.scrollTop = chatContainer.scrollHeight;
-			hasNewMessages = false;
 		}
-	}
-
-	function isNearBottom(): boolean {
-		if (!chatContainer) return true;
-		const threshold = 100;
-		return chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < threshold;
 	}
 
 	async function fetchSessions() {
@@ -115,16 +108,10 @@
 		};
 	});
 
-	$effect(() => {
-		if (messages.length !== lastMessageCount) {
-			lastMessageCount = messages.length;
-			if (isNearBottom()) {
-				scrollToBottom();
-			} else {
-				hasNewMessages = true;
-			}
-		}
-	});
+	async function handlePullRefresh() {
+		const last = messages[messages.length - 1];
+		await fetchMessages(last?.created_at);
+	}
 </script>
 
 <div class="app">
@@ -165,9 +152,7 @@
 	</header>
 
 	<div class="messages-wrapper">
-	{#if hasNewMessages}
-		<button class="new-messages-toast" onclick={scrollToBottom}>New messages</button>
-	{/if}
+	<NewMessagesToast container={chatContainer} {messages} onScrollToBottom={scrollToBottom} />
 	<div class="messages" bind:this={chatContainer}>
 		{#if activeSessionId}
 			{#each messages as msg (msg.id)}
@@ -179,6 +164,7 @@
 		{:else}
 			<p class="empty">Select a session to start chatting.</p>
 		{/if}
+		<PullToRefreshIndicator container={chatContainer} onRefresh={handlePullRefresh} />
 	</div>
 	</div>
 
@@ -308,29 +294,6 @@
 		flex-direction: column;
 	}
 
-	.new-messages-toast {
-		position: absolute;
-		bottom: 12px;
-		left: 50%;
-		transform: translateX(-50%);
-		z-index: 5;
-		background: var(--color-primary);
-		color: #fff;
-		border: none;
-		border-radius: var(--radius-full);
-		padding: 6px 16px;
-		font-size: var(--text-base);
-		font-family: var(--font-mono);
-		cursor: pointer;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-		transition: var(--transition);
-	}
-
-	.new-messages-toast:hover {
-		background: var(--color-primary-hover);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-	}
-
 	.messages {
 		flex: 1;
 		overflow-y: auto;
@@ -339,6 +302,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
+		overscroll-behavior-y: none;
 	}
 
 	.empty {
