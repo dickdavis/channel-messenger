@@ -47,9 +47,9 @@ describe('PullToRefreshIndicator', () => {
     })
     await tick()
 
-    container.dispatchEvent(touchEvent('touchstart', 100))
+    container.dispatchEvent(touchEvent('touchstart', 140))
     await tick()
-    container.dispatchEvent(touchEvent('touchmove', 140))
+    container.dispatchEvent(touchEvent('touchmove', 100))
     await tick()
 
     expect(screen.queryByText('Pull to refresh')).toBeTruthy()
@@ -78,7 +78,7 @@ describe('PullToRefreshIndicator', () => {
     })
     await tick()
 
-    await simulatePull(container, 100, 200) // 100px > 60px threshold
+    await simulatePull(container, 200, 100) // 100px > 60px threshold
 
     expect(onRefresh).toHaveBeenCalled()
   })
@@ -91,7 +91,7 @@ describe('PullToRefreshIndicator', () => {
     })
     await tick()
 
-    await simulatePull(container, 100, 130) // 30px < 60px threshold
+    await simulatePull(container, 130, 100) // 30px < 60px threshold
 
     expect(onRefresh).not.toHaveBeenCalled()
   })
@@ -105,11 +105,11 @@ describe('PullToRefreshIndicator', () => {
     })
     await tick()
 
-    container.dispatchEvent(touchEvent('touchstart', 100))
+    container.dispatchEvent(touchEvent('touchstart', 200))
     await tick()
-    container.dispatchEvent(touchEvent('touchmove', 200))
+    container.dispatchEvent(touchEvent('touchmove', 100))
     await tick()
-    container.dispatchEvent(touchEvent('touchend', 200))
+    container.dispatchEvent(touchEvent('touchend', 100))
 
     // Wait for the async handleTouchEnd to set refreshing = true
     await new Promise((resolve) => setTimeout(resolve, 10))
@@ -132,7 +132,7 @@ describe('PullToRefreshIndicator', () => {
     })
     await tick()
 
-    await simulatePull(container, 100, 130) // below threshold
+    await simulatePull(container, 130, 100) // below threshold
 
     expect(screen.queryByText('Pull to refresh')).toBeNull()
   })
@@ -145,7 +145,7 @@ describe('PullToRefreshIndicator', () => {
     })
     await tick()
 
-    await simulatePull(container, 200, 100) // pulling up, not down
+    await simulatePull(container, 100, 200) // pulling down, not up
 
     expect(onRefresh).not.toHaveBeenCalled()
   })
