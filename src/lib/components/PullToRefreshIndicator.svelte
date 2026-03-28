@@ -12,6 +12,7 @@
 	let refreshing = $state(false);
 	const threshold = 60;
 	let startY = 0;
+	let tracking = false;
 
 	function isNearBottom (): boolean {
 		if (!container) return true;
@@ -25,23 +26,29 @@
 		function handleTouchStart (e: TouchEvent) {
 			if (!isNearBottom()) return;
 			startY = e.touches[0].clientY;
-			pulling = true;
+			tracking = true;
 			pullDistance = 0;
 		}
 
 		function handleTouchMove (e: TouchEvent) {
-			if (!pulling) return;
-			pullDistance = Math.max(0, e.touches[0].clientY - startY);
+			if (!tracking) return;
+			const dist = Math.max(0, startY - e.touches[0].clientY);
+			pullDistance = dist;
+			if (dist > 0) pulling = true;
 		}
 
 		async function handleTouchEnd () {
 			if (pulling && pullDistance >= threshold) {
 				refreshing = true;
+				pulling = false;
+				pullDistance = 0;
 				await onRefresh();
 				refreshing = false;
+			} else {
+				pulling = false;
+				pullDistance = 0;
 			}
-			pulling = false;
-			pullDistance = 0;
+			tracking = false;
 		}
 
 		el.addEventListener('touchstart', handleTouchStart);
