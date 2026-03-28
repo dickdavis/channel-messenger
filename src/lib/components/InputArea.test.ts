@@ -60,4 +60,28 @@ describe('InputArea', () => {
 
     expect(onSend).not.toHaveBeenCalled()
   })
+
+  test('Escape blurs the textarea', async () => {
+    render(InputArea, { props: { onSend: mock() } })
+
+    const textarea = screen.getByPlaceholderText('Type a message...')
+    textarea.focus()
+    expect(document.activeElement).toBe(textarea)
+
+    await fireEvent.keyDown(textarea, { key: 'Escape' })
+
+    expect(document.activeElement).not.toBe(textarea)
+  })
+
+  test('exposes focus() method', () => {
+    const result = render(InputArea, { props: { onSend: mock() } })
+    const component = result.component as unknown as { focus: () => void }
+
+    const textarea = screen.getByPlaceholderText('Type a message...')
+    expect(document.activeElement).not.toBe(textarea)
+
+    component.focus()
+
+    expect(document.activeElement).toBe(textarea)
+  })
 })

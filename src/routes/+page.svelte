@@ -7,6 +7,7 @@
 	import NewMessagesToast from '$lib/components/NewMessagesToast.svelte';
 	import PullToRefreshIndicator from '$lib/components/PullToRefreshIndicator.svelte';
 	import { createSessionSocket, type Message } from '$lib/ws';
+	import { registerShortcuts } from '$lib/keyboard-shortcuts';
 
 	type Session = { id: number; name: string; status: string; created_at: string };
 
@@ -18,6 +19,7 @@
 	let chatContainer: HTMLElement | undefined = $state();
 	let socketCleanup: (() => void) | null = null;
 	let selectGeneration = 0;
+	let inputArea: { focus: () => void } | undefined = $state();
 
 	function scrollToBottom() {
 		if (chatContainer) {
@@ -102,15 +104,28 @@
 		const sessionsInterval = setInterval(() => {
 			if (document.visibilityState === 'visible') fetchSessions();
 		}, 5000);
+		const removeShortcuts = registerShortcuts([
+			{ key: 'r', handler: refreshMessages },
+			{ key: 't', handler () { inputArea?.focus() } },
+			{ key: 'Escape', handler () { (document.activeElement as HTMLElement)?.blur() }, activeInInput: true }
+		]);
 		return () => {
 			clearInterval(sessionsInterval);
 			socketCleanup?.();
+			removeShortcuts();
 		};
 	});
 
-	async function handlePullRefresh() {
-		const last = messages[messages.length - 1];
-		await fetchMessages(last?.created_at);
+	let refreshing = $state(false);
+
+	async function refreshMessages() {
+		refreshing = true;
+		const [last] = [messages[messages.length - 1]];
+		await Promise.all([
+			fetchMessages(last?.created_at),
+			new Promise((resolve) => setTimeout(resolve, 1000))
+		]);
+		refreshing = false;
 	}
 </script>
 
@@ -153,6 +168,11 @@
 
 	<div class="messages-wrapper">
 	<NewMessagesToast container={chatContainer} {messages} onScrollToBottom={scrollToBottom} />
+	{#if refreshing}
+		<div class="refresh-overlay">
+			<span class="spinner"></span>
+		</div>
+	{/if}
 	<div class="messages" bind:this={chatContainer}>
 		{#if activeSessionId}
 			{#each messages as msg (msg.id)}
@@ -164,12 +184,12 @@
 		{:else}
 			<p class="empty">Select a session to start chatting.</p>
 		{/if}
-		<PullToRefreshIndicator container={chatContainer} onRefresh={handlePullRefresh} />
+		<PullToRefreshIndicator container={chatContainer} onRefresh={refreshMessages} />
 	</div>
 	</div>
 
 	{#if activeSessionId}
-		<InputArea onSend={sendMessage} />
+		<InputArea bind:this={inputArea} onSend={sendMessage} />
 	{/if}
 </div>
 
@@ -303,6 +323,29 @@
 		flex-direction: column;
 		gap: 8px;
 		overscroll-behavior-y: none;
+	}
+
+	.refresh-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 4;
+		background: rgba(0, 0, 0, 0.3);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.spinner {
+		width: 32px;
+		height: 32px;
+		border: 3px solid rgba(255, 255, 255, 0.3);
+		border-top-color: #fff;
+		border-radius: 50%;
+		animation: spin 0.6s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
 	}
 
 	.empty {
