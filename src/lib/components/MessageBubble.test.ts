@@ -67,6 +67,16 @@ describe('MessageBubble', () => {
     expect((time as HTMLElement).textContent?.length).toBeGreaterThan(0)
   })
 
+  test('formats timestamp as YYYY-MM-DD HH:MM in 24-hour time', () => {
+    render(MessageBubble, {
+      props: { content: 'hi', role: 'user', createdAt: '2026-06-15T14:05:30Z' }
+    })
+    const time = document.querySelector('time')
+    expect(time).toBeTruthy()
+    const text = (time as HTMLElement).textContent
+    expect(text).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+  })
+
   test('renders lists', () => {
     render(MessageBubble, {
       props: {
