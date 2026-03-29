@@ -298,6 +298,206 @@ describe('SessionHub.webSocketMessage', () => {
       expect(hub.ctx.waitUntil).not.toHaveBeenCalled()
     })
   })
+
+  describe('permission requests', () => {
+    test('relays permission_request from token client to cookie clients', async () => {
+      const { hub, websockets } = createHub()
+
+      const { ws: sender } = createMockWebSocket({ authenticated: true, authType: 'token', userId: 1, sessionId: '5' })
+      const { ws: browser, sent: browserSent } = createMockWebSocket({ authenticated: true, authType: 'cookie', userId: 1, sessionId: '5' })
+      const { ws: otherToken, sent: otherTokenSent } = createMockWebSocket({ authenticated: true, authType: 'token', userId: 1, sessionId: '5' })
+
+      websockets.push(sender, browser, otherToken)
+
+      await hub.webSocketMessage(sender, JSON.stringify({
+        type: 'permission_request',
+        request_id: 'req-1',
+        tool_name: 'Bash',
+        description: 'Run command: ls',
+        input_preview: '{"command":"ls"}'
+      }))
+
+      expect(browserSent).toHaveLength(1)
+      const relayed = JSON.parse(browserSent[0])
+      expect(relayed.type).toBe('permission_request')
+      expect(relayed.request_id).toBe('req-1')
+      expect(relayed.tool_name).toBe('Bash')
+      expect(relayed.description).toBe('Run command: ls')
+      expect(relayed.input_preview).toBe('{"command":"ls"}')
+
+      // Should not relay to other token clients
+      expect(otherTokenSent).toHaveLength(0)
+    })
+
+    test('does not relay permission_request from cookie client', async () => {
+      const { hub, websockets } = createHub()
+
+      const { ws: browser } = createMockWebSocket({ authenticated: true, authType: 'cookie', userId: 1, sessionId: '5' })
+      const { ws: tokenClient, sent: tokenSent } = createMockWebSocket({ authenticated: true, authType: 'token', userId: 1, sessionId: '5' })
+
+      websockets.push(browser, tokenClient)
+
+      await hub.webSocketMessage(browser, JSON.stringify({
+        type: 'permission_request',
+        request_id: 'req-1',
+        tool_name: 'Bash',
+        description: 'test',
+        input_preview: '{}'
+      }))
+
+      expect(tokenSent).toHaveLength(0)
+    })
+
+    test('does not relay permission_request to cookie clients on different session', async () => {
+      const { hub, websockets } = createHub()
+
+      const { ws: sender } = createMockWebSocket({ authenticated: true, authType: 'token', userId: 1, sessionId: '5' })
+      const { ws: otherSession, sent: otherSent } = createMockWebSocket({ authenticated: true, authType: 'cookie', userId: 1, sessionId: '6' })
+
+      websockets.push(sender, otherSession)
+
+      await hub.webSocketMessage(sender, JSON.stringify({
+        type: 'permission_request',
+        request_id: 'req-1',
+        tool_name: 'Bash',
+        description: 'test',
+        input_preview: '{}'
+      }))
+
+      expect(otherSent).toHaveLength(0)
+    })
+  })
+
+  describe('permission responses', () => {
+    test('relays permission_response from cookie client to token clients and stores message', async () => {
+      const db = new MockD1Database()
+      db.onQuery('INSERT INTO messages', { meta: { last_row_id: 99, changes: 1 } })
+      db.onQuery('UPDATE sessions', { meta: { last_row_id: 0, changes: 1 } })
+
+      const { hub, websockets } = createHub(db)
+
+      const { ws: browser } = createMockWebSocket({ authenticated: true, authType: 'cookie', userId: 1, sessionId: '5' })
+      const { ws: tokenClient, sent: tokenSent } = createMockWebSocket({ authenticated: true, authType: 'token', userId: 1, sessionId: '5' })
+      const { ws: browserReceiver } = createMockWebSocket({ authenticated: true, authType: 'cookie', userId: 1, sessionId: '5' })
+
+      websockets.push(browser, tokenClient, browserReceiver)
+
+      await hub.webSocketMessage(browser, JSON.stringify({
+        type: 'permission_response',
+        request_id: 'req-1',
+        behavior: 'allow',
+        tool_name: 'Bash',
+        description: 'Run command: ls'
+      }))
+
+      // Token client receives contract-compliant response (no tool_name/description)
+      expect(tokenSent).toHaveLength(2) // permission_response + broadcast message
+      const response = JSON.parse(tokenSent[0])
+      expect(response).toEqual({
+        type: 'permission_response',
+        request_id: 'req-1',
+        behavior: 'allow'
+      })
+      expect(response.tool_name).toBeUndefined()
+      expect(response.description).toBeUndefined()
+
+      // Assistant message is stored
+      const insertCall = db.calls.find((c: any) => c.sql.includes('INSERT INTO messages'))
+      expect(insertCall).toBeTruthy()
+      if (insertCall == null) return
+      expect(insertCall.bindings[1]).toBe('assistant')
+      expect(insertCall.bindings[2]).toContain('### Permission request')
+      expect(insertCall.bindings[2]).toContain('**Bash**')
+      expect(insertCall.bindings[2]).toContain('Run command: ls')
+      expect(insertCall.bindings[2]).toContain('\u2705 Allowed')
+
+      // Broadcast message sent to all clients on session
+      const broadcastMsg = JSON.parse(tokenSent[1])
+      expect(broadcastMsg.type).toBe('message')
+      expect(broadcastMsg.message.role).toBe('assistant')
+      expect(broadcastMsg.message.id).toBe(99)
+    })
+
+    test('stores denied permission with correct emoji', async () => {
+      const db = new MockD1Database()
+      db.onQuery('INSERT INTO messages', { meta: { last_row_id: 100, changes: 1 } })
+      db.onQuery('UPDATE sessions', { meta: { last_row_id: 0, changes: 1 } })
+
+      const { hub, websockets } = createHub(db)
+
+      const { ws: browser } = createMockWebSocket({ authenticated: true, authType: 'cookie', userId: 1, sessionId: '5' })
+      websockets.push(browser)
+
+      await hub.webSocketMessage(browser, JSON.stringify({
+        type: 'permission_response',
+        request_id: 'req-2',
+        behavior: 'deny',
+        tool_name: 'Bash',
+        description: 'Run command: rm -rf /'
+      }))
+
+      const insertCall = db.calls.find((c: any) => c.sql.includes('INSERT INTO messages'))
+      expect(insertCall).toBeTruthy()
+      if (insertCall == null) return
+      expect(insertCall.bindings[2]).toContain('\u274c Denied')
+    })
+
+    test('does not relay permission_response from token client', async () => {
+      const { hub, websockets } = createHub()
+
+      const { ws: tokenSender } = createMockWebSocket({ authenticated: true, authType: 'token', userId: 1, sessionId: '5' })
+      const { ws: browser, sent: browserSent } = createMockWebSocket({ authenticated: true, authType: 'cookie', userId: 1, sessionId: '5' })
+
+      websockets.push(tokenSender, browser)
+
+      await hub.webSocketMessage(tokenSender, JSON.stringify({
+        type: 'permission_response',
+        request_id: 'req-1',
+        behavior: 'allow'
+      }))
+
+      expect(browserSent).toHaveLength(0)
+    })
+
+    test('does not relay permission_response from unauthenticated client', async () => {
+      const { hub, websockets } = createHub()
+
+      const { ws: unauthed } = createMockWebSocket({ authenticated: false, sessionId: '5' })
+      const { ws: tokenClient, sent: tokenSent } = createMockWebSocket({ authenticated: true, authType: 'token', userId: 1, sessionId: '5' })
+
+      websockets.push(unauthed, tokenClient)
+
+      await hub.webSocketMessage(unauthed, JSON.stringify({
+        type: 'permission_response',
+        request_id: 'req-1',
+        behavior: 'allow'
+      }))
+
+      expect(tokenSent).toHaveLength(0)
+    })
+
+    test('uses fallback values when tool_name and description are missing', async () => {
+      const db = new MockD1Database()
+      db.onQuery('INSERT INTO messages', { meta: { last_row_id: 101, changes: 1 } })
+      db.onQuery('UPDATE sessions', { meta: { last_row_id: 0, changes: 1 } })
+
+      const { hub, websockets } = createHub(db)
+
+      const { ws: browser } = createMockWebSocket({ authenticated: true, authType: 'cookie', userId: 1, sessionId: '5' })
+      websockets.push(browser)
+
+      await hub.webSocketMessage(browser, JSON.stringify({
+        type: 'permission_response',
+        request_id: 'req-3',
+        behavior: 'allow'
+      }))
+
+      const insertCall = db.calls.find((c: any) => c.sql.includes('INSERT INTO messages'))
+      expect(insertCall).toBeTruthy()
+      if (insertCall == null) return
+      expect(insertCall.bindings[2]).toContain('**Unknown tool**')
+    })
+  })
 })
 
 describe('SessionHub.handleBroadcast', () => {

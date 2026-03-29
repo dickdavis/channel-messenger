@@ -6,7 +6,8 @@
 	import SessionList from '$lib/components/SessionList.svelte';
 	import NewMessagesToast from '$lib/components/NewMessagesToast.svelte';
 	import PullToRefreshIndicator from '$lib/components/PullToRefreshIndicator.svelte';
-	import { createSessionSocket, type Message } from '$lib/ws';
+	import PermissionModal from '$lib/components/PermissionModal.svelte';
+	import { createSessionSocket, type Message, type PermissionRequest } from '$lib/ws';
 	import { registerShortcuts } from '$lib/keyboard-shortcuts';
 
 	type Session = { id: number; name: string; status: string; created_at: string };
@@ -20,6 +21,9 @@
 	let socketCleanup: (() => void) | null = null;
 	let selectGeneration = 0;
 	let inputArea: { focus: () => void } | undefined = $state();
+	let pendingPermissions: PermissionRequest[] = $state([]);
+	let socketSend: ((data: unknown) => void) | null = null;
+	let currentPermission = $derived(pendingPermissions.length > 0 ? pendingPermissions[0] : null);
 
 	function scrollToBottom() {
 		if (chatContainer) {
@@ -54,6 +58,8 @@
 		const generation = ++selectGeneration;
 		socketCleanup?.();
 		socketCleanup = null;
+		socketSend = null;
+		pendingPermissions = [];
 		activeSessionId = id;
 		sidebarOpen = false;
 		messages = [];
@@ -63,7 +69,7 @@
 		await new Promise((r) => setTimeout(r, 0));
 		scrollToBottom();
 
-		const { close } = createSessionSocket(id, {
+		const { close, send } = createSessionSocket(id, {
 			onMessage (msg) {
 				if (!messages.some((m) => m.id === msg.id)) {
 					messages = [...messages, msg];
@@ -73,9 +79,24 @@
 				if (!isReconnect) return;
 				const last = messages[messages.length - 1];
 				fetchMessages(last?.created_at);
+			},
+			onPermissionRequest (req) {
+				pendingPermissions = [...pendingPermissions, req];
 			}
 		});
 		socketCleanup = close;
+		socketSend = send;
+	}
+
+	function handlePermissionResponse (requestId: string, behavior: 'allow' | 'deny', toolName: string, description: string) {
+		socketSend?.({
+			type: 'permission_response',
+			request_id: requestId,
+			behavior,
+			tool_name: toolName,
+			description
+		});
+		pendingPermissions = pendingPermissions.filter((p) => p.request_id !== requestId);
 	}
 
 	async function sendMessage(content: string) {
@@ -191,6 +212,8 @@
 	{#if activeSessionId}
 		<InputArea bind:this={inputArea} onSend={sendMessage} />
 	{/if}
+
+	<PermissionModal request={currentPermission} onRespond={handlePermissionResponse} />
 </div>
 
 <style>

@@ -115,7 +115,7 @@ export class SessionHub extends DurableObject<Env> {
   async webSocketMessage (ws: WebSocket, data: string | ArrayBuffer): Promise<void> {
     if (typeof data !== 'string') return
 
-    let parsed: { type: string, token?: string, content?: string }
+    let parsed: { type: string, token?: string, content?: string, request_id?: string, tool_name?: string, description?: string, input_preview?: string, behavior?: string }
     try {
       parsed = JSON.parse(data)
     } catch {
@@ -153,6 +153,14 @@ export class SessionHub extends DurableObject<Env> {
         console.error('[session-hub] handleIncomingMessage error:', err)
         ws.send(JSON.stringify({ type: 'error', message: 'Failed to send message' }))
       }
+    }
+
+    if (parsed.type === 'permission_request' && typeof parsed.request_id === 'string') {
+      await this.handlePermissionRequest(ws, parsed)
+    }
+
+    if (parsed.type === 'permission_response' && typeof parsed.request_id === 'string' && typeof parsed.behavior === 'string') {
+      await this.handlePermissionResponse(ws, parsed as { type: string, request_id: string, behavior: string, tool_name?: string, description?: string })
     }
   }
 
@@ -203,6 +211,84 @@ export class SessionHub extends DurableObject<Env> {
     // Send push notifications only for assistant messages
     if (role === 'assistant' && this.env.VAPID_PUBLIC_KEY !== '' && this.env.VAPID_PRIVATE_KEY !== '' && this.env.VAPID_SUBJECT !== '') {
       this.ctx.waitUntil(sendPushForSession(db, this.env, sessionId, message))
+    }
+  }
+
+  async handlePermissionRequest (ws: WebSocket, parsed: { request_id?: string, tool_name?: string, description?: string, input_preview?: string }): Promise<void> {
+    const attachment: SocketAttachment | null = ws.deserializeAttachment()
+    if (attachment?.authenticated !== true || attachment.authType !== 'token') return
+
+    const payload = JSON.stringify({
+      type: 'permission_request',
+      request_id: parsed.request_id,
+      tool_name: parsed.tool_name,
+      description: parsed.description,
+      input_preview: parsed.input_preview
+    })
+
+    for (const client of this.ctx.getWebSockets()) {
+      const clientAttachment: SocketAttachment | null = client.deserializeAttachment()
+      if (clientAttachment?.authenticated === true &&
+          clientAttachment.authType === 'cookie' &&
+          clientAttachment.sessionId === attachment.sessionId) {
+        client.send(payload)
+      }
+    }
+  }
+
+  async handlePermissionResponse (ws: WebSocket, parsed: { request_id: string, behavior: string, tool_name?: string, description?: string }): Promise<void> {
+    const attachment: SocketAttachment | null = ws.deserializeAttachment()
+    if (attachment?.authenticated !== true || attachment.authType !== 'cookie' || attachment.sessionId == null) return
+
+    const sessionId = attachment.sessionId
+
+    // Relay to token clients (only type/request_id/behavior per data contract)
+    const responsePayload = JSON.stringify({
+      type: 'permission_response',
+      request_id: parsed.request_id,
+      behavior: parsed.behavior
+    })
+
+    for (const client of this.ctx.getWebSockets()) {
+      const clientAttachment: SocketAttachment | null = client.deserializeAttachment()
+      if (clientAttachment?.authenticated === true &&
+          clientAttachment.authType === 'token' &&
+          clientAttachment.sessionId === sessionId) {
+        client.send(responsePayload)
+      }
+    }
+
+    // Store decision as assistant message
+    const toolName = parsed.tool_name ?? 'Unknown tool'
+    const description = parsed.description ?? ''
+    const statusLine = parsed.behavior === 'allow' ? '\u2705 Allowed' : '\u274c Denied'
+    const content = `### Permission request\n**${toolName}**\n\n${description}\n\n${statusLine}`
+
+    const db = this.env.DB
+    const result = await db
+      .prepare('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)')
+      .bind(sessionId, 'assistant', content)
+      .run()
+
+    await db
+      .prepare("UPDATE sessions SET updated_at = datetime('now') WHERE id = ?")
+      .bind(sessionId)
+      .run()
+
+    const message: BroadcastPayload = {
+      id: result.meta.last_row_id,
+      session_id: Number(sessionId),
+      role: 'assistant',
+      content,
+      created_at: new Date().toISOString()
+    }
+
+    const msgPayload = JSON.stringify({ type: 'message', message })
+    for (const client of this.ctx.getWebSockets()) {
+      const clientAttachment: SocketAttachment | null = client.deserializeAttachment()
+      if (clientAttachment?.authenticated === true && clientAttachment.sessionId === sessionId) {
+        client.send(msgPayload)
+      }
     }
   }
 
