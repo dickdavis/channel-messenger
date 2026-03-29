@@ -23,6 +23,7 @@ export function sessionHub (): Plugin {
     configureServer (server: ViteDevServer) {
       const wss = new WebSocketServer({ noServer: true })
       const sessions = new Map<string, Set<WebSocket>>()
+      const socketMeta = new WeakMap<WebSocket, { authType: 'cookie' | 'token' }>()
 
       // Wait for the adapter's platform env to be shared via hooks.server.ts
       async function getPlatformEnv (): Promise<{ DB: D1Database, HMAC_SECRET: string, VAPID_PUBLIC_KEY: string, VAPID_PRIVATE_KEY: string, VAPID_SUBJECT: string, [key: string]: unknown }> {
@@ -64,6 +65,7 @@ export function sessionHub (): Plugin {
           function markAuthenticated (): void {
             clearTimeout(timeout)
             authenticated = true
+            if (authType != null) socketMeta.set(ws, { authType })
             const set = sessions.get(sessionId) ?? new Set()
             sessions.set(sessionId, set)
             set.add(ws)
@@ -101,7 +103,7 @@ export function sessionHub (): Plugin {
           // Handle incoming messages (auth + content)
           const onMessage = (data: Buffer | string): void => {
             void (async () => {
-              let parsed: { type: string, token?: string, content?: string }
+              let parsed: { type: string, token?: string, content?: string, request_id?: string, tool_name?: string, description?: string, input_preview?: string, behavior?: string }
               try {
                 parsed = JSON.parse(String(data))
               } catch {
@@ -189,6 +191,85 @@ export function sessionHub (): Plugin {
                 } catch (err) {
                   console.error('[session-hub] Message handling error:', err)
                   ws.send(JSON.stringify({ type: 'error', message: 'Failed to send message' }))
+                }
+              }
+
+              // Permission request: relay from token clients to cookie clients
+              if (parsed.type === 'permission_request' && typeof parsed.request_id === 'string') {
+                if (!authenticated || authType !== 'token') return
+
+                const payload = JSON.stringify({
+                  type: 'permission_request',
+                  request_id: parsed.request_id,
+                  tool_name: parsed.tool_name,
+                  description: parsed.description,
+                  input_preview: parsed.input_preview
+                })
+
+                const sockets = sessions.get(sessionId)
+                if (sockets != null) {
+                  for (const client of sockets) {
+                    if (socketMeta.get(client)?.authType === 'cookie') {
+                      client.send(payload)
+                    }
+                  }
+                }
+              }
+
+              // Permission response: relay from cookie clients to token clients + store message
+              if (parsed.type === 'permission_response' && typeof parsed.request_id === 'string' && typeof parsed.behavior === 'string') {
+                if (!authenticated || authType !== 'cookie') return
+
+                // Relay to token clients (only type/request_id/behavior per data contract)
+                const responsePayload = JSON.stringify({
+                  type: 'permission_response',
+                  request_id: parsed.request_id,
+                  behavior: parsed.behavior
+                })
+
+                const sockets = sessions.get(sessionId)
+                if (sockets != null) {
+                  for (const client of sockets) {
+                    if (socketMeta.get(client)?.authType === 'token') {
+                      client.send(responsePayload)
+                    }
+                  }
+                }
+
+                // Store decision as assistant message
+                try {
+                  const toolName = parsed.tool_name ?? 'Unknown tool'
+                  const description = parsed.description ?? ''
+                  const statusLine = parsed.behavior === 'allow' ? '\u2705 Allowed' : '\u274c Denied'
+                  const content = `### Permission request\n**${toolName}**\n\n${description}\n\n${statusLine}`
+
+                  const env = await getPlatformEnv()
+                  const result = await env.DB
+                    .prepare('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)')
+                    .bind(sessionId, 'assistant', content)
+                    .run()
+
+                  await env.DB
+                    .prepare("UPDATE sessions SET updated_at = datetime('now') WHERE id = ?")
+                    .bind(sessionId)
+                    .run()
+
+                  const message = {
+                    id: result.meta.last_row_id,
+                    session_id: Number(sessionId),
+                    role: 'assistant',
+                    content,
+                    created_at: new Date().toISOString()
+                  }
+
+                  const msgPayload = JSON.stringify({ type: 'message', message })
+                  if (sockets != null) {
+                    for (const client of sockets) {
+                      client.send(msgPayload)
+                    }
+                  }
+                } catch (err) {
+                  console.error('[session-hub] Permission response handling error:', err)
                 }
               }
             })()

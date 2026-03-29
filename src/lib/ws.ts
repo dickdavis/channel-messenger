@@ -6,9 +6,17 @@ export interface Message {
   created_at: string
 }
 
+export interface PermissionRequest {
+  request_id: string
+  tool_name: string
+  description: string
+  input_preview: string
+}
+
 interface WSCallbacks {
   onMessage: (msg: Message) => void
   onConnect: (isReconnect: boolean) => void
+  onPermissionRequest?: (req: PermissionRequest) => void
 }
 
 const MAX_BACKOFF_MS = 30000
@@ -16,7 +24,7 @@ const MAX_BACKOFF_MS = 30000
 export function createSessionSocket (
   sessionId: number,
   callbacks: WSCallbacks
-): { close: () => void } {
+): { close: () => void, send: (data: unknown) => void } {
   let disposed = false
   let ws: WebSocket | null = null
   let backoff = 1000
@@ -30,7 +38,7 @@ export function createSessionSocket (
     ws = new WebSocket(`${protocol}//${location.host}/api/ws/sessions/${sessionId}`)
 
     ws.addEventListener('message', (event) => {
-      let parsed: { type: string, message?: Message, status?: string }
+      let parsed: Record<string, unknown>
       try {
         parsed = JSON.parse(event.data)
       } catch {
@@ -46,7 +54,11 @@ export function createSessionSocket (
       }
 
       if (parsed.type === 'message' && parsed.message != null) {
-        callbacks.onMessage(parsed.message)
+        callbacks.onMessage(parsed.message as Message)
+      }
+
+      if (parsed.type === 'permission_request' && callbacks.onPermissionRequest != null) {
+        callbacks.onPermissionRequest(parsed as unknown as PermissionRequest)
       }
     })
 
@@ -69,6 +81,12 @@ export function createSessionSocket (
     backoff = Math.min(backoff * 2, MAX_BACKOFF_MS)
   }
 
+  function send (data: unknown): void {
+    if (ws != null && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(data))
+    }
+  }
+
   function close (): void {
     disposed = true
     if (reconnectTimer != null) {
@@ -83,5 +101,5 @@ export function createSessionSocket (
 
   connect()
 
-  return { close }
+  return { close, send }
 }
